@@ -1,0 +1,19 @@
+# The LM blend: TF-IDF lr mixed with a logistic regression on Qwen 3 hidden states.
+# Chosen by notebooks/05-lm-sweep on seed-7 folds (P3b Task 4, run v1 of 2026-10-24).
+# Layers 6..9 of 4B (window 4) are early layers: they still describe the surface of the
+# text, where style lives. C=0.1 is strong regularization: 2,560 dense features but only
+# about 2,160 training passages per fold.
+# weight=0.1 is the LM's share of the PROBABILITY mix, small probably because the LM head
+# is far more confident than lr (to be checked), not because it matters less.
+# A/B on fresh seed-42 folds: blend minus lr = +0.084, 95% CI [+0.066, +0.101].
+name: lm_blend
+text_config: lr
+lm_variation: 4b-base
+layer: 6
+layer_window: 4
+max_length: 512
+batch_size: 16
+C: 0.1
+weight: 0.1
+n_splits: 5
+seed: 42

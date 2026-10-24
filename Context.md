@@ -36,27 +36,28 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 ## Status
 
-- Phase: **P0–P2 complete.** The first leaderboard submission (2026-10-24) scored public
-  LB **0.320**, against CV 0.321, so **the backtest tracks the leaderboard**.
-  - Plan (done): [P0–P2](docs/superpowers/plans/2026-10-24-p0-p2-foundations-to-first-submission.md).
-  - **Leaderboard snapshot, 2026-10-24:** 3,012 teams; median 0.512; top-10% cutoff 0.632;
-    best 0.703. We're about 2,687th. The field is far ahead of the early public baselines
-    (0.35–0.40), so the next plan must go after the big gains: I-001 prompt assignment with
-    I-007 topic subtraction, then transformer and LLM features (I-002).
-  - **P3a done (2026-10-24): per-prompt assignment.** CV jumped 0.321 → 0.406, but the
-    **leaderboard A/B test showed no gain**: public LB 0.320 with assignment, against 0.320
-    without. The offline gain didn't transfer, so `ASSIGN` stays off until we understand
-    why (see IDEAS I-001). Plan: [P3a](docs/superpowers/plans/2026-10-24-p3a-prompt-assignment.md).
-  - **Diagnosed:** the gain depends on the test's layout (answers per prompt): +0.084 at
-    18, about 0 at 1–3. The hidden test most likely has few answers per prompt, so
-    prompt-structure tricks (I-001, I-007) are shelved, and the base model is the lever.
-- Champion: **`lr`** (word + character TF-IDF with logistic regression). It has the best
-  CV, and the bootstrap A/B test against `nbsvm` gives a 95% CI of [+0.008, +0.040], see
-  the [baselines notebook](https://www.kaggle.com/code/ryqn00/name-that-llm-baselines).
-  Chosen with the user on 2026-10-24.
+- Phase: **P3b in progress**, "LM features, then tune"
+  ([plan](docs/superpowers/plans/2026-10-24-p3b-lm-features.md)). Tasks 1–4 are done.
+  - **Task 4 (2026-10-24):** `lr` blended with Qwen 3 4B layers 6–9 beats `lr` by +0.084 on
+    fresh folds (95% CI [+0.066, +0.101]), so it's **promoted to the leaderboard A/B**.
+    See the [sweep notebook](https://www.kaggle.com/code/ryqn00/name-that-llm-lm-layer-sweep).
+  - Next: Task 5, the GPU submission of `lm_blend`, then Task 6, Optuna tuning.
+- **Lessons so far:**
+  - P0–P2: public LB **0.320** against CV 0.321, so **the backtest tracks the leaderboard**.
+  - P3a: per-prompt assignment lifted CV from 0.321 to 0.406, but the LB stayed at 0.320.
+    The gain depends on the test's layout (+0.084 at 18 answers per prompt, about 0 at
+    1–3), so prompt-structure tricks (I-001, I-007) are shelved. The base model is the
+    lever.
+- **Leaderboard snapshot, 2026-10-24:** 3,012 teams; median 0.512; top-10% cutoff 0.632;
+  best 0.703. We're about 2,687th.
+- Champion: **`lr`** (word + character TF-IDF with logistic regression), chosen with the
+  user on 2026-10-24. Its bootstrap A/B against `nbsvm` gives a 95% CI of [+0.008, +0.040],
+  see the [baselines notebook](https://www.kaggle.com/code/ryqn00/name-that-llm-baselines).
+  - **Challenger: `lm_blend`.** It replaces `lr` only if its public LB beats 0.320.
 
 | date | model | CV | LB | W&B run |
 |---|---|---|---|---|
+| 2026-10-24 | lm_blend (lr + Qwen 3 4B layers 6–9) | ≈ 0.405 | pending | — |
 | 2026-10-24 | lr | 0.3212 | **0.320** | r0lx5cja |
 | 2026-10-24 | lr + assign (topic groups) | 0.4056 | 0.320 | to8unxny |
 | 2026-10-24 | nbsvm | 0.2971 | — | sxhd09jf |
@@ -151,5 +152,6 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 ## Next steps
 
-1. P3b: improve the base model itself (I-012 tuning, I-008 style features, M3
-   lab-then-model), since those gains don't depend on the hidden test's structure.
+1. P3b Task 5: the offline GPU submission of `lm_blend` (release v0.6.0, then the user's
+   OK to push and to submit). Keep it only if the public LB beats 0.320.
+2. P3b Task 6: Optuna tuning of the blend. Its code is already on branch `p3b-07-tuning`.

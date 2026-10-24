@@ -2,6 +2,48 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-10-24 → 25 · Session 4: LLM hidden states beat TF-IDF (P3b, tasks 1–4)
+
+**Did**
+- `lm.py` reads open Qwen 3 base models and averages each layer's hidden states over the
+  tokens of a passage. torch and transformers are imported only inside its functions, so
+  the text-only path never needs them (ADR 0002).
+- Added dense-feature CV (`run_cv_features`), probability blending (`blend.py`) and
+  `BlendConfig`.
+- A GPU notebook extracted every layer of Qwen 3 0.6B, 1.7B and 4B base for the 2,699
+  training passages in 13 minutes on one T4.
+- A chained CPU notebook swept the layers, refined the best one, chose the blend weight and
+  ran the A/B test on fresh folds (73 minutes,
+  [lm-layer-sweep](https://www.kaggle.com/code/ryqn00/name-that-llm-lm-layer-sweep)).
+
+**Learned**
+- **Every model size beats TF-IDF on its own.** The best single layer of each size, on
+  seed-7 folds: 0.6B 0.345, 1.7B 0.377 and 4B 0.380, against `lr` at 0.330. Bigger helps,
+  with diminishing returns from 1.7B to 4B. The forum's "≈ 0.39 for early layers" holds:
+  4B layers 6–9 reach 0.386.
+- **Early layers win.** The best layers sit at 11–22% of the depth, and the last layers
+  are the worst (0.28–0.32). They specialize in predicting the next token, while early
+  layers still describe the surface of the text, where style lives.
+- **Even layer 0 matches TF-IDF.** It's the plain average of the input token embeddings,
+  with no context at all, and it scores 0.33–0.36. A guess: an average weights tokens by
+  frequency, and frequent tokens (function words, punctuation) carry style, while TF-IDF
+  boosts rare, topical words. New idea I-017.
+- **A small blend weight can hide a big effect.** The best weight on the LM side is only
+  0.1, yet the blend beats both of its parts. A weighted mean mixes probabilities, so a
+  very confident model moves the result even at 10%. That's a hypothesis, to check during
+  tuning (I-015).
+- **The A/B on folds never used for any choice (seed 42):** blend minus `lr` = **+0.084**,
+  95% CI [+0.066, +0.101]. Promoted to the leaderboard A/B test.
+- **Chained notebooks** keep GPU time for the step that needs a GPU: 13 GPU-minutes for the
+  extraction, then 73 minutes of free CPU for the CVs.
+- Kaggle names a notebook's URL after its *title* on the first push, not after the
+  metadata `id`.
+
+**Scores:** `lm_blend`: CV ≈ 0.405 (seed 42, = `lr` 0.3212 + 0.0841). LB pending.
+
+**Next:** Task 5, the offline GPU submission with the blend, kept only if the public LB
+beats 0.320. Then Optuna tuning (Task 6).
+
 ## 2026-10-24 · Session 3c: why the assignment trick failed
 
 **Did**
