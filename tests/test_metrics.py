@@ -38,6 +38,20 @@ def test_bootstrap_clearly_better_model_has_interval_above_zero():
     assert diff > 0 and lo > 0 and lo <= diff <= hi
 
 
+def test_bootstrap_accepts_pandas_series_with_any_index():
+    # Callers pass DataFrame columns. After filtering, their index is no longer 0..n-1,
+    # and series[positions] would look the positions up as LABELS.
+    import pandas as pd
+
+    y, g = _toy()
+    pred_a = y.copy()
+    pred_a[g % 2 == 0] = "kimi-k3"
+    index = range(1000, 1000 + len(y))
+    as_series = [pd.Series(v, index=index) for v in (y, pred_a, y, g)]
+    expected = prompt_bootstrap_ci(y, pred_a, y, g, n_boot=200, seed=0)
+    assert prompt_bootstrap_ci(*as_series, n_boot=200, seed=0) == expected
+
+
 def test_bootstrap_is_reproducible():
     y, g = _toy()
     pred_a = y.copy()

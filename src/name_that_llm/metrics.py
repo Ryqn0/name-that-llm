@@ -64,15 +64,27 @@ def prompt_bootstrap_ci(
     (overconfident). Resampling whole prompts keeps each prompt's 18 rows together. It
     also keeps all 18 classes in every resample, which balanced accuracy needs.
     """
-    # TODO(you): write the body here, in 5-10 lines. Suggested steps:
-    #   1. rng = np.random.default_rng(seed). The seed makes results reproducible.
-    #   2. Find the unique groups, and precompute the row indices of each group
-    #      (a dict {group: np.flatnonzero(groups == group)}), so the loop stays fast.
-    #   3. Repeat n_boot times: draw len(unique groups) groups WITH replacement
-    #      (rng.choice(..., replace=True)), concatenate their row indices, and store
-    #      score(y_true[idx], pred_b[idx]) - score(y_true[idx], pred_a[idx]).
-    #   4. lo, hi = the alpha/2 and 1 - alpha/2 quantiles of the stored differences
-    #      (np.quantile).
-    #   5. Return (observed difference on ALL rows, lo, hi), each as a float.
-    # Check your work with:  uv run --all-extras pytest tests/test_metrics.py -q
-    raise NotImplementedError("prompt_bootstrap_ci: your turn! See the TODO above.")
+    # (Body written by Ryqn0 as a learning contribution, then reviewed.)
+    # Work on plain NumPy arrays. Indexing a pandas Series with an integer array looks the
+    # integers up as index LABELS, which silently picks the wrong rows (or raises KeyError)
+    # once the index isn't 0..n-1, e.g. after filtering.
+    y_true, pred_a, pred_b, groups = (np.asarray(a) for a in (y_true, pred_a, pred_b, groups))
+
+    # PAIRED bootstrap: in each round, both models are scored on the SAME resampled rows,
+    # so "this resample happened to be easy" cancels out of the difference.
+    rng = np.random.default_rng(seed)
+    unique_groups = np.unique(groups)
+    group_indices = {group: np.flatnonzero(groups == group) for group in unique_groups}
+    differences = []
+
+    for _ in range(n_boot):
+        sampled_groups = rng.choice(unique_groups, size=len(unique_groups), replace=True)
+        sampled_indices = np.concatenate([group_indices[g] for g in sampled_groups])
+        diff = score(y_true[sampled_indices], pred_b[sampled_indices]) - score(
+            y_true[sampled_indices], pred_a[sampled_indices]
+        )
+        differences.append(diff)
+
+    lo, hi = np.quantile(differences, [alpha / 2, 1 - alpha / 2])
+    observed_diff = score(y_true, pred_b) - score(y_true, pred_a)
+    return float(observed_diff), float(lo), float(hi)
