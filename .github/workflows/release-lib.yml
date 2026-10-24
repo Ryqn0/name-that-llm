@@ -1,0 +1,44 @@
+# Continuous Delivery for the library: every version tag publishes the package to Kaggle.
+#
+# The final submission notebook runs OFFLINE, so it can't `pip install` from the internet.
+# Instead, this workflow builds our wheel (a zip of the package), downloads the few
+# pure-Python dependencies Kaggle's image lacks (pandera, plus helpers it needs), and
+# uploads all of them as a new version of the Kaggle Dataset `ryqn00/name-that-llm-lib`.
+# The notebook attaches that dataset and installs from it with `pip install --no-index`.
+#
+# Trigger: push a tag such as v0.3.0 (git tag v0.3.0 && git push origin v0.3.0).
+name: release-lib
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  kaggle-dataset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+
+      # Our own package: a pure-Python wheel (py3-none-any), so it installs on any Python
+      # version, including Kaggle's 3.13. The named configs ship inside it (ADR 0001).
+      - run: uv build --wheel --out-dir dist-kaggle
+
+      # Dependencies that may be missing on Kaggle. All are pure-Python wheels, so no
+      # platform or Python-version flags are needed. --no-deps: numpy, pandas, pydantic,
+      # pyarrow, scikit-learn and pyyaml are already in Kaggle's image, and pip leaves
+      # already-satisfied packages alone.
+      - run: >-
+          uvx pip download --no-deps --dest dist-kaggle
+          pandera typeguard typing-inspect mypy-extensions
+
+      - run: cp kaggle/lib-dataset/dataset-metadata.json dist-kaggle/
+
+      # A new dataset VERSION replaces the previous file set. The token lives in the
+      # repo's GitHub Secrets, never in the code.
+      - run: uvx --from "kaggle>=2.2.3" kaggle datasets version -p dist-kaggle -m "$GITHUB_REF_NAME"
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
