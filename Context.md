@@ -81,6 +81,15 @@ outputs are a public repo, a progress diary, and a live demo app.
   2. Push, then `gh pr create --fill`.
   3. `gh pr checks --watch`.
   4. `gh pr merge --squash --delete-branch`.
+- **Release (CD):** pushing a tag `vX.Y.Z` triggers the GitHub Actions workflow
+  `release-lib`, which publishes a new version of the Kaggle dataset
+  [ryqn00/name-that-llm-lib](https://www.kaggle.com/datasets/ryqn00/name-that-llm-lib):
+  our wheel plus pandera and its helpers. The offline submission notebook installs from
+  it.
+  - The dataset's license field is `other`, because Kaggle's license list has no MIT and
+    rejected `"MIT"` with a generic server error. The description states MIT.
+  - The workflow uses the secret `KAGGLE_API_TOKEN`, a **dedicated** Kaggle token for
+    GitHub Actions, so revoking it never breaks the local token.
 - **Attribution:** commit messages end with
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. PR bodies end with
   `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.

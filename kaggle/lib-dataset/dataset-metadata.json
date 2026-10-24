@@ -1,5 +1,7 @@
 {
   "title": "name-that-llm-lib",
   "id": "ryqn00/name-that-llm-lib",
-  "licenses": [{"name": "MIT"}]
+  "subtitle": "Offline wheels for the Name That LLM end-to-end MLOps project",
+  "description": "Wheels of the open-source `name-that-llm` package (MIT license) plus the pure-Python dependencies Kaggle's image lacks, so competition notebooks can install it with the internet off. Published automatically by CI on every version tag. Source code: https://github.com/Ryqn0/name-that-llm",
+  "licenses": [{"name": "other"}]
 }
