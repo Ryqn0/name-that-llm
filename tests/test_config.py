@@ -26,3 +26,11 @@ def test_blend_config_round_trips_and_validates_weight(tmp_path):
     assert cfg.layer == 6 and cfg.text_config == "lr" and cfg.seed == 42
     with pytest.raises(ValidationError):
         BlendConfig(name="x", lm_variation="1.7b-base", layer=1, weight=1.5)
+
+
+def test_shipped_lm_blend_config_loads_with_its_text_config():
+    # The offline submission loads both by NAME from the installed wheel, so a typo in
+    # either file would only surface during the 9-hour scoring run.
+    cfg = load_config("lm_blend", model_cls=BlendConfig)
+    assert cfg.name == "lm_blend" and cfg.lm_variation == "4b-base"
+    assert load_config(cfg.text_config).name == cfg.text_config
