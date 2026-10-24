@@ -2,6 +2,30 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-10-24 · Session 3a: the puzzle backtest (P3a, tasks 1–3)
+
+**Did**
+- `topic_groups`: rebuilds the hidden prompts by clustering content-word TF-IDF (cosine
+  distance, average linkage). On train, the groups match the true prompts with an adjusted
+  Rand index of 0.909.
+- `assign_labels`: one exact assignment per group (`linear_sum_assignment` on −log p), so
+  each model is used at most once per prompt.
+- `--assign` in the CLI adds the puzzle backtest to CV, logged to W&B (run `to8unxny`).
+
+**Learned**
+- **Using the data's structure beats a better model, for now:** plain 0.321 → **0.406**
+  with the rebuilt groups, and 0.413 with the true groups. That's +0.085 from
+  post-processing alone.
+- **The fake test data was the bug, not the algorithm:** passages that share a rare word
+  across topics (e.g. `style10`) look more alike than passages sharing the topic, because
+  rare words carry a high IDF weight.
+- **Process:** a merge must wait for CI. The merge now runs only via
+  `gh pr checks --watch && gh pr merge`.
+
+**Scores:** CV `lr` + assignment **0.4056** (not yet on the leaderboard).
+
+**Next:** Task 4, a submission with assignment as a leaderboard A/B test against 0.320.
+
 ## 2026-10-24 · Session 2f: the first leaderboard submission
 
 **Did**

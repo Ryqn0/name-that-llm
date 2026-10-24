@@ -27,8 +27,13 @@ from name_that_llm.metrics import lab_accuracy, per_class_recall
 PROJECT = "name-that-llm"
 
 
-def log_cv_run(cfg: ExperimentConfig, result, df: pd.DataFrame) -> str:
-    """Log one CVResult (from train.run_cv) to W&B, and return the run id."""
+def log_cv_run(
+    cfg: ExperimentConfig, result, df: pd.DataFrame, extra: dict[str, float] | None = None
+) -> str:
+    """Log one CVResult (from train.run_cv) to W&B, and return the run id.
+
+    `extra`: additional summary metrics, e.g. the puzzle backtest's `puzzle_assigned`.
+    """
     import wandb
 
     run = wandb.init(project=PROJECT, job_type="cv", name=cfg.name, config=cfg.model_dump())
@@ -41,6 +46,7 @@ def log_cv_run(cfg: ExperimentConfig, result, df: pd.DataFrame) -> str:
     # lot. It's the number to watch for calibration (it matters for the I-001 assignment).
     run.summary["oof_log_loss"] = log_loss(y, result.oof, labels=LABELS)
     run.summary["fold_scores"] = result.fold_scores
+    run.summary.update(extra or {})
 
     recall = per_class_recall(y, result.pred).rename_axis("model").reset_index()
     label_index = {label: i for i, label in enumerate(LABELS)}

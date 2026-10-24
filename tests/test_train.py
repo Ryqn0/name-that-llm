@@ -42,3 +42,13 @@ def test_main_runs_without_tracking(fake_data_dir, tmp_path, capsys):
 def test_train_never_imports_wandb():
     code = "import sys, name_that_llm.train; assert 'wandb' not in sys.modules"
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_evaluate_assignment_reports_all_four_numbers(fake_train):
+    from name_that_llm.train import evaluate_assignment
+
+    report = evaluate_assignment(run_cv(_cfg("mnb"), fake_train), fake_train)
+    assert set(report) == {"plain", "assigned", "oracle", "grouping_ari"}
+    assert (
+        report["oracle"] >= report["plain"] - 1e-9
+    )  # assignment never hurts with true groups here
