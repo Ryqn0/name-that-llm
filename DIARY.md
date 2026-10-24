@@ -2,6 +2,28 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-10-24 · Session 3c: why the assignment trick failed
+
+**Did**
+- Read forum thread 750213, *"Test-time prompt grouping: simulation vs. LB"*. Its claim:
+  the trick's gain depends on how many answers each hidden prompt has.
+- **Verified it with our own code:** I subsampled each training prompt to m random answers
+  and re-measured the assignment gain on lr's out-of-fold probabilities.
+
+**Learned**
+- **Gain by layout:** +0.084 at m = 18 (train's layout), +0.003 at m = 6, and about
+  0 to −0.01 at m = 1–3. Even with the TRUE groups, m = 1–3 gives only +0.000 to +0.004.
+- **So the hidden test most likely has few answers per prompt**, and our zero LB gain is
+  exactly what that layout predicts. No bug, just a wrong assumption about production data.
+- **The MLOps lesson:** a validation set must mirror production's *structure*, not just
+  its distribution. Our backtest copied train's layout, which the test doesn't share.
+- **Topic subtraction (I-007) is doubtful too:** with small groups, the group mean contains
+  each passage's own style, so subtracting it removes signal.
+
+**Scores:** unchanged (public LB 0.320).
+
+**Next:** P3b, a better base model: tuning, style features, lab-then-model.
+
 ## 2026-10-24 · Session 3b: the leaderboard A/B test says "no"
 
 **Did**
