@@ -1,0 +1,5 @@
+# NB-SVM (Wang & Manning, 2012): Naive Bayes feature weights + a linear model.
+# A famously strong text baseline (idea I-005). Uses the default alpha (0.1).
+name: nbsvm
+model: nbsvm
+C: 4.0

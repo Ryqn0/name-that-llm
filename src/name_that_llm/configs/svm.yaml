@@ -1,0 +1,5 @@
+# Linear SVM: the community's reference baseline (≈0.33 CV), wrapped in a calibrator
+# so it also outputs probabilities.
+name: svm
+model: svm
+C: 4.0
