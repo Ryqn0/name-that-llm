@@ -35,3 +35,17 @@ def test_submit_and_train_never_import_wandb():
         "import sys, name_that_llm.submit, name_that_llm.train; assert 'wandb' not in sys.modules"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_predict_submission_with_assign_survives_three_rows(fake_train, fake_data_dir):
+    test = load_test(fake_data_dir)
+    sub = predict_submission(_cfg(), fake_train, test, assign=True)
+    assert sub["id"].tolist() == ["000001", "a1b2c3", "999999"]
+    assert sub["model"].isin(LABELS).all()
+
+
+def test_predict_submission_assign_gives_one_of_each_per_topic(fake_train):
+    # 18 fresh passages on ONE topic: assignment must use every label exactly once
+    test = fake_train[fake_train["prompt_id"] == "prompt0"][["id", "text"]].reset_index(drop=True)
+    sub = predict_submission(_cfg(), fake_train, test, assign=True)
+    assert sorted(sub["model"]) == sorted(LABELS)
