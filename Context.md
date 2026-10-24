@@ -93,7 +93,10 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 - Kaggle `ryqn00`: token in `~/.kaggle/access_token`.
 - GitHub `Ryqn0`: repo `Ryqn0/name-that-llm`, public.
-- Later: W&B (`WANDB_API_KEY`), DagsHub (MLflow), Hugging Face (`HF_TOKEN`), Grafana Cloud.
+- W&B: project `name-that-llm`, which must stay **private** because its `train-data`
+  artifact holds competition data. Locally the key comes from `wandb login`; in Kaggle
+  notebooks, from the Kaggle Secret `WANDB_API_KEY`.
+- Later: DagsHub (MLflow), Hugging Face (`HF_TOKEN`), Grafana Cloud.
 
 ## Rules checklist
 
