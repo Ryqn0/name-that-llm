@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ExperimentConfig(BaseModel):
@@ -37,8 +37,31 @@ class ExperimentConfig(BaseModel):
     seed: int = 42
 
 
-def load_config(name_or_path: str | Path) -> ExperimentConfig:
+class BlendConfig(BaseModel):
+    """The TF-IDF text model blended with a logistic regression on LM hidden states (P3b).
+
+    Final probabilities = (1 - weight) * text model + weight * LM model.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    text_config: str = "lr"  # name of the ExperimentConfig for the text side
+    lm_variation: str  # Kaggle Models variation of Qwen 3, e.g. "1.7b-base"
+    layer: int  # hidden_states index: 0 = embeddings, k = transformer block k
+    layer_window: int = 1  # average `layer_window` consecutive layers, starting at `layer`
+    max_length: int = 512  # tokens per passage (ours are <= ~400)
+    batch_size: int = 16
+    C: float = 1.0  # regularization of the LM-side logistic regression
+    weight: float = Field(ge=0.0, le=1.0)  # the LM's share of the blend
+    n_splits: int = 5
+    seed: int = 42
+
+
+def load_config(name_or_path: str | Path, model_cls: type[BaseModel] = ExperimentConfig):
     """Load a config by NAME (a file shipped inside the package) or by PATH (any YAML file).
+
+    `model_cls` picks the schema: ExperimentConfig (text models, the default) or BlendConfig.
 
     The named configs live inside the package (`name_that_llm/configs/`), not at the repo
     root. That way the wheel used by the offline Kaggle notebook carries them along
@@ -53,4 +76,4 @@ def load_config(name_or_path: str | Path) -> ExperimentConfig:
             available = sorted(p.name.removesuffix(".yaml") for p in resource.parent.iterdir())
             raise FileNotFoundError(f"no config named {name_or_path!r}; available: {available}")
         text = resource.read_text(encoding="utf-8")
-    return ExperimentConfig(**yaml.safe_load(text))
+    return model_cls(**yaml.safe_load(text))
