@@ -34,9 +34,10 @@ outputs are a public repo, a progress diary, and a live demo app.
 ## Status
 
 - Phase: **P2 Backtest and baselines**.
-  - Done: P0, and P1 (the data layer and EDA). From P2, the five baseline models (Task 7).
-  - Next: the backtesting core (Task 6, waiting on the user's bootstrap), then the CV
-    runner and W&B (Task 8).
+  - Done: P0, and P1 (the data layer and EDA). From P2: the five baseline models (Task 7)
+    and the backtesting core (Task 6: prompt-grouped folds, metrics, and the paired prompt
+    bootstrap written by the user).
+  - Next: the CV runner and W&B tracking (Task 8).
   - Plan: [P0–P2](docs/superpowers/plans/2026-10-24-p0-p2-foundations-to-first-submission.md).
 - Champion: none yet.
 
