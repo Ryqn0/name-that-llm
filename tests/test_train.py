@@ -81,6 +81,6 @@ def test_run_cv_features_keeps_columns_aligned_when_a_class_is_missing(fake_trai
 def test_text_paths_never_import_torch_or_optuna():
     code = (
         "import sys, name_that_llm.submit, name_that_llm.train, name_that_llm.blend; "
-        "assert not {'torch', 'optuna', 'transformers'} & set(sys.modules)"
+        "assert not {'torch', 'optuna', 'transformers', 'name_that_llm.tune'} & set(sys.modules)"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
