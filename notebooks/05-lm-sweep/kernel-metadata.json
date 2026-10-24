@@ -1,0 +1,15 @@
+{
+  "id": "ryqn00/name-that-llm-lm-sweep",
+  "title": "Name That LLM - LM layer sweep",
+  "code_file": "lm_sweep.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": false,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": ["name-that-llm"],
+  "kernel_sources": ["ryqn00/name-that-llm-lm-features"],
+  "model_sources": []
+}
