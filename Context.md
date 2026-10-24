@@ -39,10 +39,18 @@ outputs are a public repo, a progress diary, and a live demo app.
     bootstrap written by the user).
   - Next: the CV runner and W&B tracking (Task 8).
   - Plan: [P0–P2](docs/superpowers/plans/2026-10-24-p0-p2-foundations-to-first-submission.md).
-- Champion: none yet.
+- Champion: **`lr`** (word + character TF-IDF with logistic regression). It has the best
+  CV, and the bootstrap A/B test against `nbsvm` gives a 95% CI of [+0.008, +0.040], see
+  the [baselines notebook](https://www.kaggle.com/code/ryqn00/name-that-llm-baselines).
+  Chosen with the user on 2026-10-24.
 
 | date | model | CV | LB | W&B run |
 |---|---|---|---|---|
+| 2026-10-24 | lr | 0.3212 | (Task 11) | r0lx5cja |
+| 2026-10-24 | nbsvm | 0.2971 | — | sxhd09jf |
+| 2026-10-24 | mnb | 0.2852 | — | 7f8bv2zr |
+| 2026-10-24 | svm | 0.2848 | — | 5p2yum3r |
+| 2026-10-24 | cnb | 0.2474 | — | xzuywz5t |
 
 ## Decisions
 

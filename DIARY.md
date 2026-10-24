@@ -2,6 +2,32 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-10-24 · Session 2e: five baselines and the first offline A/B test
+
+**Did**
+- Ran all five baselines on identical prompt-grouped folds: in the Kaggle notebook
+  [ryqn00/name-that-llm-baselines](https://www.kaggle.com/code/ryqn00/name-that-llm-baselines),
+  and logged to W&B from my PC (runs r0lx5cja, sxhd09jf, 7f8bv2zr, 5p2yum3r, xzuywz5t).
+- **First offline A/B test, with my bootstrap:** lr minus nbsvm = +0.024, 95% CI
+  [+0.008, +0.040], so **lr is the baseline champion**.
+- Built the submission builder (Task 10) and prepared the release pipeline (Task 11).
+
+**Learned**
+- The ranking: lr 0.321 > nbsvm 0.297 > mnb 0.285 ≈ svm 0.285 > cnb 0.247. The fold spread
+  is ±0.005–0.010, so gaps smaller than about 0.01 are noise. That's why the decision used
+  the bootstrap and not the raw ranking.
+- **Same code, same folds, same numbers:** the local run, the W&B runs and the notebook all
+  match exactly. That's reproducibility in practice.
+- The classifier's top weights confirm the EDA: punctuation for Claude, GPT, GLM and Kimi;
+  vocabulary for Gemini and Qwen.
+- A public logistic regression reaches 0.356, so our feature settings have headroom
+  (idea I-012).
+
+**Scores:** champion lr, CV **0.3212** (not yet submitted).
+
+**Next:** Task 11, which publishes the package as a Kaggle dataset, runs the offline
+submission notebook, and gives us the first leaderboard score.
+
 ## 2026-10-24 · Session 2d: CV runner and the first tracked experiment
 
 **Did**
