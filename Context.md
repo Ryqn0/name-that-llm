@@ -44,6 +44,9 @@ outputs are a public repo, a progress diary, and a live demo app.
     **leaderboard A/B test showed no gain**: public LB 0.320 with assignment, against 0.320
     without. The offline gain didn't transfer, so `ASSIGN` stays off until we understand
     why (see IDEAS I-001). Plan: [P3a](docs/superpowers/plans/2026-10-24-p3a-prompt-assignment.md).
+  - **Diagnosed:** the gain depends on the test's layout (answers per prompt): +0.084 at
+    18, about 0 at 1–3. The hidden test most likely has few answers per prompt, so
+    prompt-structure tricks (I-001, I-007) are shelved, and the base model is the lever.
 - Champion: **`lr`** (word + character TF-IDF with logistic regression). It has the best
   CV, and the bootstrap A/B test against `nbsvm` gives a 95% CI of [+0.008, +0.040], see
   the [baselines notebook](https://www.kaggle.com/code/ryqn00/name-that-llm-baselines).
@@ -96,6 +99,9 @@ outputs are a public repo, a progress diary, and a live demo app.
     rejected `"MIT"` with a generic server error. The description states MIT.
   - The workflow uses the secret `KAGGLE_API_TOKEN`, a **dedicated** Kaggle token for
     GitHub Actions, so revoking it never breaks the local token.
+- **Lesson (P3a):** before trusting any trick that exploits prompt structure, re-measure
+  it on subsampled layouts (m = 1, 2, 3, 6 answers per prompt), because the hidden test
+  is not laid out like train.
 - **Attribution:** commit messages end with
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. PR bodies end with
   `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
@@ -142,6 +148,5 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 ## Next steps
 
-1. Find out why the assignment gain didn't transfer to the leaderboard (I-001).
-2. P3b: improve the base model itself (I-012 tuning, I-008 style features, M3
+1. P3b: improve the base model itself (I-012 tuning, I-008 style features, M3
    lab-then-model), since those gains don't depend on the hidden test's structure.
