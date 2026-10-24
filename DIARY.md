@@ -2,6 +2,26 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-10-24 · Session 3b: the leaderboard A/B test says "no"
+
+**Did**
+- Released v0.4.0 (tag → CI → Kaggle dataset) and submitted the same `lr` model with
+  `ASSIGN = True`. The Kaggle log confirms the assignment really ran.
+
+**Learned**
+- **Public LB: 0.320 with assignment, 0.320 without.** CV had promised +0.085. An exact
+  tie to three decimals means the post-processing had essentially no effect on the
+  hidden test.
+- **This is why we A/B test on the real target.** The puzzle backtest only proves the trick
+  works on data with *train's* structure. Two explanations remain: the hidden test may not
+  have one answer per model per prompt, or our topic grouping may fail on it.
+- Following the rule we set *before* seeing the result: keep `ASSIGN` only if the LB
+  improves. It didn't, so the default goes back to `False`, the simpler path.
+
+**Scores:** `lr` + assignment: CV 0.4056, public LB **0.320**.
+
+**Next:** diagnose I-001, then P3b (a better base model).
+
 ## 2026-10-24 · Session 3a: the puzzle backtest (P3a, tasks 1–3)
 
 **Did**
