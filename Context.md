@@ -96,6 +96,11 @@ outputs are a public repo, a progress diary, and a live demo app.
 - W&B: project `name-that-llm`, which must stay **private** because its `train-data`
   artifact holds competition data. Locally the key comes from `wandb login`; in Kaggle
   notebooks, from the Kaggle Secret `WANDB_API_KEY`.
+  - It lives in the one-member team `dungryan0-ryan-dung` with visibility "Team", which is
+    effectively private. **Before adding any teammate, switch the project to Private.**
+  - Runs: [forge.coreweave.com/wandb/dungryan0-ryan-dung/name-that-llm](https://forge.coreweave.com/wandb/dungryan0-ryan-dung/name-that-llm).
+    W&B now runs on CoreWeave's domain, and wandb 0.31 stores its login under
+    `api.forge.coreweave.com` in `~/_netrc`.
 - Later: DagsHub (MLflow), Hugging Face (`HF_TOKEN`), Grafana Cloud.
 
 ## Rules checklist

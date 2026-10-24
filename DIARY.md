@@ -2,6 +2,35 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-10-24 · Session 2d: CV runner and the first tracked experiment
+
+**Did**
+- `run_cv` produces out-of-fold (OOF) probabilities for every row, through a CLI:
+  `python -m name_that_llm.train --config mnb --track`.
+- `log_cv_run` sends the config, the metrics, the per-class recall, the confusion matrix and
+  two artifacts to W&B. The artifacts are `train-data` (the input, for lineage) and
+  `oof-mnb` (the output).
+- **First tracked run** ([W&B](https://forge.coreweave.com/wandb/dungryan0-ryan-dung/name-that-llm/runs/9i018wmv)),
+  verified through the API: metrics present, `train-data:v0` recorded as input, `oof-mnb:v0`
+  as output.
+- Compared our EDA with five public ones. The best new ideas (subtracting each prompt's
+  average, opening and closing phrases, classifier weights) go to IDEAS.md.
+
+**Learned**
+- **Lab accuracy is 0.66, model accuracy 0.29:** two thirds of passages get the right lab,
+  but under a third get the right model. "The lab is easy, the model is hard", now measured.
+- **Log loss 2.13 vs 2.89 for uniform guessing:** the probabilities carry information, but
+  are far from confident. This matters for calibration and the I-001 assignment.
+- **W&B can't declare inputs offline**, so the code uses `use_artifact` online and
+  `log_artifact` offline. The offline test alone wouldn't have exercised the online path,
+  which is why the PR waited for this live check.
+- **Privacy has to hold before the first upload.** The W&B "Team" visibility is private only
+  while the team has one member.
+
+**Scores:** mnb CV balanced accuracy **0.2852** (folds 0.270–0.294). Not submitted.
+
+**Next:** Task 9, all five baselines in a Kaggle notebook, and the first offline A/B test.
+
 ## 2026-10-24 · Session 2c: backtesting core (with my first contribution)
 
 **Did**
