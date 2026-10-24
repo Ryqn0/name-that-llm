@@ -2,6 +2,43 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-10-24 · Session 2b: EDA on Kaggle
+
+**Did**
+- Published the EDA notebook
+  [ryqn00/name-that-llm-eda](https://www.kaggle.com/code/ryqn00/name-that-llm-eda). It ran
+  in about 100 s on Kaggle's CPU.
+- Smoke-tested every cell locally first, then re-ran the results locally with Kaggle's exact
+  library versions so the written findings match the run.
+- Added a CI job that tests Kaggle's real runtime (Python 3.13 plus Kaggle's pandas, numpy
+  and scikit-learn versions).
+
+**Learned**
+- **Kaggle's environment isn't what I assumed:** Python 3.13 (not 3.11) and *older*
+  libraries than my local setup (pandas 2.3, not 3.1). Testing against production's real
+  versions beats guessing them.
+- **The data path was the *second* candidate**, `/kaggle/input/competitions/...`, so building
+  the loader to try several paths paid off on its first real run.
+- **Charts, in words:**
+  - The length box plots overlap heavily: length is a weak signal.
+  - The punctuation heatmap has a few loud cells. Two gemini models use **no em dashes at
+    all**, glm-5.3 uses the most, gpt-5.6-luna stands out for parentheses and kimi-k3 for
+    semicolons.
+  - The similarity heatmap is dark along the sibling blocks: the gemini flashes, the gpt-5.6
+    trio, the two GLMs.
+- **Two-class checks:** gemini-3.7 vs 3.8 scores **0.56** (near a coin flip), sibling pairs
+  0.64–0.67, and a cross-lab pair 0.89. The 3.7 vs 3.8 result fits the forum's
+  request-routing report.
+- **Style-only clustering** (adjusted Rand index 0.49): Google forms one clean cluster,
+  Anthropic and ZAI share one (GLM writes like Claude), and OpenAI spreads over three.
+- **Tooling:** pre-commit run from the main repo silently skips files in another worktree,
+  while still reporting "passed". Always run hooks from inside the checkout that owns the
+  file.
+
+**Scores:** none yet. The first submission comes in Task 11.
+
+**Next:** the user's bootstrap (Task 6), then the CV runner with W&B (Task 8).
+
 ## 2026-10-24 · Session 2: foundation, CI, data layer
 
 **Did**
