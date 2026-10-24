@@ -17,6 +17,10 @@ builds a real, production-style ML system one stage at a time, with every step e
 - **Progress diary:** [DIARY.md](DIARY.md). **Ideas backlog:** [IDEAS.md](IDEAS.md)
 - **Current status:** [Context.md](Context.md)
 
+**Latest result:** baseline `lr` (word + character TF-IDF with logistic regression), with
+public leaderboard **0.320** against prompt-grouped CV **0.321**. The offline submission
+notebook is [ryqn00/name-that-llm-submit](https://www.kaggle.com/code/ryqn00/name-that-llm-submit).
+
 ## Quickstart
 
 ```bash
