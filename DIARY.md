@@ -2,6 +2,33 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-10-24 · Session 2: foundation, CI, data layer
+
+**Did**
+- Created the public repo [Ryqn0/name-that-llm](https://github.com/Ryqn0/name-that-llm) with
+  the uv package, pre-commit hooks, docs and an MIT license.
+- Set up CI on GitHub Actions: lint, format check and tests on Python 3.11, all green.
+- Built the data layer (`data.py`, `schemas.py`, `labels.py`) test-first: 16 tests, all on
+  fake data.
+- Checked it against the real data: `(2699, 4)` train and `(3, 2)` test.
+
+**Learned**
+- **pandas silently turns `000123` into `123`** unless you pass `dtype=str`. Ids are matched
+  against Kaggle's, so that one argument decides whether a submission scores at all.
+- **NFC versus NFKC normalization:** NFKC would turn `…` into `...` and erase the
+  non-breaking space. Those are style fingerprints, so we only apply NFC.
+- **Circular imports:** `data` needs the schemas, and the schemas need the labels. Moving the
+  labels into their own dependency-free module breaks the cycle.
+- **Test data validation strictly, but the test set leniently:** an empty passage in the
+  hidden test should cost one prediction, not crash the whole 9-hour scoring run.
+- **Line endings:** Git for Windows converts files to CRLF while Linux CI uses LF. A
+  one-line `.gitattributes` keeps every machine identical.
+
+**Scores:** none yet.
+
+**Next:** the Kaggle forum post (a rule requirement, now that the code is public), then the
+EDA notebook.
+
 ## 2026-10-23 → 24 · Session 1: kickoff, research, design
 
 **Did**

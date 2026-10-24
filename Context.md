@@ -26,7 +26,8 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 ## Status
 
-- Phase: **P0 Foundations**. Plan: [P0–P2](docs/superpowers/plans/2026-10-24-p0-p2-foundations-to-first-submission.md).
+- Phase: **P1 Data**. Done: repo, CI and the data layer (loading, validation, cleaning).
+  Next: the EDA notebook. Plan: [P0–P2](docs/superpowers/plans/2026-10-24-p0-p2-foundations-to-first-submission.md).
 - Champion: none yet.
 
 | date | model | CV | LB | W&B run |
@@ -47,6 +48,10 @@ outputs are a public repo, a progress diary, and a live demo app.
   - `scripts/` and `docs/`
 - **Commands:** `uv sync --all-extras` · `uv run --all-extras pytest -q` ·
   `uv run pre-commit run --all-files`.
+- **Local data (gitignored):** `kaggle competitions download name-that-llm -p data/raw`, then
+  `Expand-Archive data/raw/name-that-llm.zip data/raw`. Load it with
+  `name_that_llm.data.load_train()` and `load_test()`, never with a bare `pd.read_csv`:
+  those functions keep ids as strings and validate the data.
 - **Code style:** comments explain the **why**, generously. This is a learning project and
   that's the user's standing request.
 - **Notebook sync:** Claude edits notebooks in the repo, then runs
@@ -91,5 +96,5 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 ## Next steps
 
-1. The user runs `scripts/setup-local.ps1` (Task 1).
-2. Task 3: CI. Task 4: the data layer.
+1. The user runs `scripts/setup-local.ps1` (Task 1) and posts on the Kaggle forum (Task 4).
+2. Task 5: the EDA notebook on Kaggle.
