@@ -21,13 +21,23 @@ outputs are a public repo, a progress diary, and a live demo app.
   (`id, model`). Limits: 5 submissions per day, 2 final picks.
 - Deadlines: entry and team merge 2027-01-06; final submission 2027-01-13 23:59 UTC.
 - All facts and rules: [design §3](docs/superpowers/specs/2026-10-23-name-that-llm-design.md#3-facts-verified-2026-10-23).
-- Kaggle environment (filled in by the EDA notebook, Task 5): Python ?, data path ?,
-  packages missing ?
+- **Kaggle environment** (EDA run, 2026-10-24):
+  - Versions: Python 3.13.15, pandas 2.3.3, numpy 2.1.3, scikit-learn 1.6.1. CI's
+    `kaggle-env` job tests exactly these.
+  - Data path: `/kaggle/input/competitions/name-that-llm`.
+  - **pandera is not preinstalled**; typeguard, typing_inspect and mypy_extensions are.
+- **Label noise:** gemini-3.7-flash vs gemini-3.8-flash is barely separable (0.56 two-class
+  accuracy, where a coin flip scores 0.50). Treat these two as near-indistinguishable.
+- **EDA results:** [the notebook on Kaggle](https://www.kaggle.com/code/ryqn00/name-that-llm-eda)
+  (its section 9 summarizes the findings).
 
 ## Status
 
-- Phase: **P1 Data**. Done: repo, CI and the data layer (loading, validation, cleaning).
-  Next: the EDA notebook. Plan: [P0–P2](docs/superpowers/plans/2026-10-24-p0-p2-foundations-to-first-submission.md).
+- Phase: **P2 Backtest and baselines**.
+  - Done: P0, and P1 (the data layer and EDA). From P2, the five baseline models (Task 7).
+  - Next: the backtesting core (Task 6, waiting on the user's bootstrap), then the CV
+    runner and W&B (Task 8).
+  - Plan: [P0–P2](docs/superpowers/plans/2026-10-24-p0-p2-foundations-to-first-submission.md).
 - Champion: none yet.
 
 | date | model | CV | LB | W&B run |
@@ -89,12 +99,16 @@ outputs are a public repo, a progress diary, and a live demo app.
 - Never commit competition data: `data/` is gitignored, and the tests use fake data.
 - Committed notebooks have their outputs stripped (pre-commit does this) and show only
   aggregate numbers.
-- A Kaggle forum post linking the repo is due once competition code is public. Status:
-  pending, Task 4.
+- Public code must also be shared on Kaggle: Foundational Rules §6.b, *"on the discussion
+  forum or notebooks associated specifically with the Competition"*. **Status: covered** by
+  the public EDA notebook
+  [ryqn00/name-that-llm-eda](https://www.kaggle.com/code/ryqn00/name-that-llm-eda), which is
+  attached to the competition and links the repo in its first cell. A forum post is
+  optional extra visibility.
 - The final ensemble notebook stays private until 2027-01-13, then gets published.
 - Kaggle pushes, dataset creation and submissions each need the user's explicit OK.
 
 ## Next steps
 
-1. The user runs `scripts/setup-local.ps1` (Task 1) and posts on the Kaggle forum (Task 4).
-2. Task 5: the EDA notebook on Kaggle.
+1. The user writes the `prompt_bootstrap_ci` body (Task 6, user contribution).
+2. Task 8: CV runner and W&B tracking (the user creates a free W&B account).

@@ -20,8 +20,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # uv installs Python 3.11, the version Kaggle's notebooks run, so CI tests the
-      # same version our code will meet in production.
+      # Python 3.11 is our MINIMUM supported version (requires-python >= 3.11), tested here
+      # with the newest locked dependencies. Kaggle's real runtime is tested by the
+      # kaggle-env job below.
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.11"
@@ -35,3 +36,22 @@ jobs:
       - run: uv run ruff check .            # lint: likely bugs, style, import order
       - run: uv run ruff format --check .   # formatting: fail instead of rewriting
       - run: uv run pytest -q               # the tests (fake data only, never real data)
+
+  # Production parity: the exact runtime of Kaggle notebooks, as recorded by the EDA run
+  # (2026-10-24). Kaggle has OLDER libraries than our lockfile (pandas 2.x, not 3.x), and
+  # the offline submission notebook can't upgrade them. If our code ever relies on
+  # something newer, this job fails here, before it fails at scoring time.
+  # Update the pins whenever Kaggle updates its image.
+  kaggle-env:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+      - run: uv sync --locked --all-extras
+      # --with layers these exact versions OVER the project environment, so these are
+      # the ones the tests import.
+      - run: >-
+          uv run --with "pandas==2.3.3" --with "numpy==2.1.3" --with "scikit-learn==1.6.1"
+          pytest -q
