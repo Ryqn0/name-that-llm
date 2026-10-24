@@ -1,5 +1,5 @@
 {
-  "id": "ryqn00/name-that-llm-lm-sweep",
+  "id": "ryqn00/name-that-llm-lm-layer-sweep",
   "title": "Name That LLM - LM layer sweep",
   "code_file": "lm_sweep.ipynb",
   "language": "python",
