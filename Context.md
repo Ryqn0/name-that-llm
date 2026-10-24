@@ -26,6 +26,9 @@ outputs are a public repo, a progress diary, and a live demo app.
     `kaggle-env` job tests exactly these.
   - Data path: `/kaggle/input/competitions/name-that-llm`.
   - **pandera is not preinstalled**; typeguard, typing_inspect and mypy_extensions are.
+  - **GPU image** (LM-features run, 2026-10-24): torch 2.11.0+cu128, CUDA 12.8,
+    transformers 5.16.1, Tesla T4. Extracting every layer for the 2,699 training passages
+    took 1.4 / 2.7 / 6.2 min for Qwen 3 0.6B / 1.7B / 4B base, all finite in float16.
 - **Label noise:** gemini-3.7-flash vs gemini-3.8-flash is barely separable (0.56 two-class
   accuracy, where a coin flip scores 0.50). Treat these two as near-indistinguishable.
 - **EDA results:** [the notebook on Kaggle](https://www.kaggle.com/code/ryqn00/name-that-llm-eda)
