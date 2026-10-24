@@ -1,0 +1,4 @@
+# Store and check out every text file with LF line endings, on every OS.
+# Without this, Git for Windows converts files to CRLF in your working copy, while
+# CI (Linux) and Kaggle see LF: the same file would differ invisibly between machines.
+* text=auto eol=lf

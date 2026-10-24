@@ -1,0 +1,20 @@
+# --- Python ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# --- Project: never commit data, models, or credentials -------------------
+# The competition rules forbid redistributing the data, so it stays out of git.
+data/
+models/
+wandb/
+dist/
+dist-kaggle/
+*.zip
+submission.parquet
+.env
+.ipynb_checkpoints/

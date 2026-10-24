@@ -1,0 +1,32 @@
+# pre-commit runs these checks on every `git commit`, before the commit is created.
+# A failing hook blocks the commit, so problems are caught on your machine instead
+# of later in CI. Versions are pinned (`rev`) for reproducibility; refresh them with
+# `uv run pre-commit autoupdate`.
+repos:
+  # Ruff: linter (finds bugs and style issues, auto-fixes what it safely can) and
+  # formatter (one consistent code style, so there's nothing to argue about).
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.2
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  # nbstripout: strips outputs from notebooks before they're committed, for two
+  # reasons. 1) Outputs could contain competition data, which the rules forbid us
+  # to redistribute. 2) Diffs stay readable: only code changes show up.
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.9.1
+    hooks:
+      - id: nbstripout
+
+  # General hygiene checks maintained by the pre-commit project itself.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml               # malformed YAML (configs, workflows)
+      - id: end-of-file-fixer        # every file ends with exactly one newline
+      - id: trailing-whitespace      # no invisible spaces at line ends
+      - id: check-added-large-files  # blocks accidental data or model files in git
+        args: [--maxkb=1000]
+      - id: detect-private-key       # blocks committing private keys
