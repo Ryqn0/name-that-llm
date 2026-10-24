@@ -5,11 +5,17 @@
   "language": "python",
   "kernel_type": "notebook",
   "is_private": false,
-  "enable_gpu": false,
+  "enable_gpu": true,
   "enable_tpu": false,
   "enable_internet": false,
-  "dataset_sources": ["ryqn00/name-that-llm-lib"],
-  "competition_sources": ["name-that-llm"],
+  "dataset_sources": [
+    "ryqn00/name-that-llm-lib"
+  ],
+  "competition_sources": [
+    "name-that-llm"
+  ],
   "kernel_sources": [],
-  "model_sources": []
+  "model_sources": [
+    "qwen-lm/qwen-3/transformers/4b-base/1"
+  ]
 }
