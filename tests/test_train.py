@@ -7,7 +7,7 @@ import pytest
 from name_that_llm.config import load_config
 from name_that_llm.data import LABELS
 from name_that_llm.metrics import score
-from name_that_llm.train import main, run_cv
+from name_that_llm.train import main, run_cv, run_cv_features
 
 
 def _cfg(name):
@@ -52,3 +52,35 @@ def test_evaluate_assignment_reports_all_four_numbers(fake_train):
     assert (
         report["oracle"] >= report["plain"] - 1e-9
     )  # assignment never hurts with true groups here
+
+
+def _signal_features(df, noise=0.2, seed=0):
+    """Fake dense features: the label as one-hot plus noise, like an informative layer.
+
+    noise 0.2 keeps the signal clear: with 18 classes and noise 0.5, even reading the
+    features perfectly is right only ~56% of the time, so a score threshold would test luck.
+    """
+    rng = np.random.default_rng(seed)
+    onehot = (df["model"].to_numpy()[:, None] == np.array(LABELS)).astype(float)
+    return onehot + rng.normal(0, noise, onehot.shape)
+
+
+def test_run_cv_features_scores_informative_features(fake_train):
+    result = run_cv_features(_signal_features(fake_train), fake_train, n_splits=3)
+    assert result.oof.shape == (len(fake_train), 18) and result.score > 0.8
+
+
+def test_run_cv_features_keeps_columns_aligned_when_a_class_is_missing(fake_train):
+    df = fake_train[(fake_train["model"] != "kimi-k3") | (fake_train["prompt_id"] == "prompt0")]
+    df = df.reset_index(drop=True)
+    result = run_cv_features(_signal_features(df), df, n_splits=3)
+    in_prompt0 = (df["prompt_id"] == "prompt0").to_numpy()
+    assert np.allclose(result.oof[in_prompt0, LABELS.index("kimi-k3")], 0)
+
+
+def test_text_paths_never_import_torch_or_optuna():
+    code = (
+        "import sys, name_that_llm.submit, name_that_llm.train, name_that_llm.blend; "
+        "assert not {'torch', 'optuna', 'transformers'} & set(sys.modules)"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)

@@ -16,6 +16,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import ComplementNB, MultinomialNB
 from sklearn.pipeline import FeatureUnion, Pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
 
 from name_that_llm.config import ExperimentConfig
@@ -81,6 +82,18 @@ class NBSVMClassifier(ClassifierMixin, BaseEstimator):
 
     def predict(self, X):
         return self.classes_[self.predict_proba(X).argmax(axis=1)]
+
+
+def build_dense_model(C: float) -> Pipeline:
+    """Logistic regression on DENSE features, such as LM hidden states (P3b).
+
+    Why scale first: hidden-state dimensions live on wildly different scales (a few take
+    huge values, most are near zero). Logistic regression's L2 penalty treats every weight
+    the same, so without scaling it would effectively ignore the small-scale dimensions.
+    StandardScaler gives each dimension mean 0 and variance 1, learned on the training
+    fold only (it sits inside the pipeline).
+    """
+    return Pipeline([("scale", StandardScaler()), ("clf", LogisticRegression(C=C, max_iter=2000))])
 
 
 def build_model(cfg: ExperimentConfig) -> Pipeline:

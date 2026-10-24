@@ -13,17 +13,19 @@ Command line:
 """
 
 import argparse
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.pipeline import Pipeline
 
 from name_that_llm.config import ExperimentConfig, load_config
 from name_that_llm.cv import make_folds
 from name_that_llm.data import LABELS, load_train
 from name_that_llm.metrics import score
-from name_that_llm.models import build_model
+from name_that_llm.models import build_dense_model, build_model
 
 
 @dataclass
@@ -35,29 +37,52 @@ class CVResult:
     score: float  # balanced accuracy over all OOF predictions
 
 
-def run_cv(cfg: ExperimentConfig, df: pd.DataFrame) -> CVResult:
-    """Cross-validate `cfg` on `df` (id, prompt_id, text, model) with prompt-grouped folds."""
-    texts = df["text"].to_numpy()
-    y = df["model"].to_numpy()
-    folds = make_folds(df, cfg.n_splits, cfg.seed).to_numpy()
+def _oof(make_model: Callable[[], Pipeline], X: np.ndarray, y: np.ndarray, folds: np.ndarray):
+    """The fold loop shared by run_cv (texts) and run_cv_features (dense features).
 
-    oof = np.zeros((len(df), len(LABELS)))
+    Returns (n_rows, 18) out-of-fold probabilities, columns in LABELS order.
+    """
+    oof = np.zeros((len(y), len(LABELS)))
     for k in np.unique(folds):
         train_rows, valid_rows = folds != k, folds == k
-        # A FRESH, untrained pipeline per fold: the vectorizer's vocabulary is learned
-        # from the training prompts only, so nothing leaks in from the held-out prompts.
-        model = build_model(cfg).fit(texts[train_rows], y[train_rows])
+        # A FRESH, untrained model per fold: everything it learns (the vectorizer's
+        # vocabulary, the scaler's means, the weights) comes from the training prompts
+        # only, so nothing leaks in from the held-out prompts.
+        model = make_model().fit(X[train_rows], y[train_rows])
         # Review Focus 3: never assume the model saw all 18 labels. If a fold's training
         # data lacked one, `classes_` has only 17 entries, and writing the probabilities
         # into columns 0..16 would silently shift every column after the gap. Mapping
         # each class to its LABELS position keeps the columns aligned. A label the model
         # never saw keeps probability 0.
         cols = [LABELS.index(c) for c in model.classes_]
-        oof[np.ix_(np.flatnonzero(valid_rows), cols)] = model.predict_proba(texts[valid_rows])
+        oof[np.ix_(np.flatnonzero(valid_rows), cols)] = model.predict_proba(X[valid_rows])
+    return oof
 
+
+def _result(oof: np.ndarray, y: np.ndarray, folds: np.ndarray) -> CVResult:
     pred = np.array(LABELS)[oof.argmax(axis=1)]
     fold_scores = [score(y[folds == k], pred[folds == k]) for k in np.unique(folds)]
     return CVResult(oof=oof, pred=pred, folds=folds, fold_scores=fold_scores, score=score(y, pred))
+
+
+def run_cv(cfg: ExperimentConfig, df: pd.DataFrame) -> CVResult:
+    """Cross-validate `cfg` on `df` (id, prompt_id, text, model) with prompt-grouped folds."""
+    y = df["model"].to_numpy()
+    folds = make_folds(df, cfg.n_splits, cfg.seed).to_numpy()
+    return _result(_oof(lambda: build_model(cfg), df["text"].to_numpy(), y, folds), y, folds)
+
+
+def run_cv_features(
+    X: np.ndarray, df: pd.DataFrame, C: float = 1.0, n_splits: int = 5, seed: int = 42
+) -> CVResult:
+    """Cross-validate a scaled logistic regression on DENSE features `X` (one row per df row).
+
+    Same prompt-grouped folds, same column alignment and same CVResult as run_cv, so the
+    OOF probabilities of both can be blended row by row (blend.py).
+    """
+    y = df["model"].to_numpy()
+    folds = make_folds(df, n_splits, seed).to_numpy()
+    return _result(_oof(lambda: build_dense_model(C), np.asarray(X), y, folds), y, folds)
 
 
 def evaluate_assignment(result: CVResult, df: pd.DataFrame) -> dict[str, float]:
