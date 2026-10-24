@@ -1,5 +1,7 @@
 # Name That LLM: an end-to-end MLOps project
 
+![CI](https://github.com/Ryqn0/name-that-llm/actions/workflows/ci.yml/badge.svg)
+
 Which of 18 frontier LLMs wrote this paragraph? This is a learning-in-public project for the
 Kaggle competition [Name That LLM](https://www.kaggle.com/competitions/name-that-llm). It
 builds a real, production-style ML system one stage at a time, with every step explained:

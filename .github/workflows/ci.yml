@@ -1,0 +1,37 @@
+# Continuous Integration: every change gets the same checks, on a clean Linux machine.
+# "Works on my machine" doesn't count. This is the gate a pull request must pass
+# before it's merged (see the Ship procedure in Context.md).
+name: ci
+
+on:
+  push:
+    branches: [main]   # direct pushes to main (and merges into it)
+  pull_request:        # every PR. Feature-branch pushes are covered by their PR, which
+                       # avoids running everything twice per commit.
+
+# Least privilege: CI only needs to read the code. If a dependency were ever
+# compromised, it couldn't use the job's token to modify the repo.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # uv installs Python 3.11, the version Kaggle's notebooks run, so CI tests the
+      # same version our code will meet in production.
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+
+      # --locked: fail if uv.lock doesn't match pyproject.toml, so CI never silently
+      # resolves different versions than the ones we tested locally.
+      # --all-extras: install the optional `track` extra (wandb), so the tracking
+      # test runs instead of being skipped.
+      - run: uv sync --locked --all-extras
+
+      - run: uv run ruff check .            # lint: likely bugs, style, import order
+      - run: uv run ruff format --check .   # formatting: fail instead of rewriting
+      - run: uv run pytest -q               # the tests (fake data only, never real data)
