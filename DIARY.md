@@ -2,6 +2,30 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-10-24 · Session 2c: backtesting core (with my first contribution)
+
+**Did**
+- `make_folds`: deals the 150 prompts into 5 folds like cards, so a prompt never spans two
+  folds. The seed is fixed, so every model is scored on identical splits.
+- Metrics: `score` (balanced accuracy), `per_class_recall`, and `lab_accuracy` (right lab,
+  possibly the wrong model).
+- **I wrote the body of `prompt_bootstrap_ci`**, the statistical core of every A/B test from
+  now on. Claude's review found one bug: pandas Series with a non-default index. A new test
+  reproduced it (KeyError), and a one-line `np.asarray` fix turned it green.
+
+**Learned**
+- **Why resample prompts, not rows:** the 18 answers to one prompt are linked, sharing a
+  topic and its difficulty. Treating 2,699 rows as independent would make the confidence
+  interval too narrow. We'd "see" improvements that are really luck.
+- **Paired beats unpaired:** scoring both models on the *same* resample cancels out "this
+  sample happened to be easy". Only the *difference* between the models varies.
+- **The pandas indexing trap:** `series[[0, 1, 2]]` uses index *labels*, not positions. It
+  works by accident while the index is 0..n-1, then breaks silently after filtering.
+
+**Scores:** none yet.
+
+**Next:** the CV runner and W&B tracking (Task 8).
+
 ## 2026-10-24 · Session 2b: EDA on Kaggle
 
 **Did**
