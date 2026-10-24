@@ -2,6 +2,33 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-10-24 · Session 2f: the first leaderboard submission
+
+**Did**
+- Created a **dedicated** Kaggle token for GitHub Actions (secret `KAGGLE_API_TOKEN`), so
+  the CI credential can be revoked without touching my own.
+- Created the public dataset
+  [ryqn00/name-that-llm-lib](https://www.kaggle.com/datasets/ryqn00/name-that-llm-lib).
+  Tagging `v0.3.0` made GitHub Actions publish a new version of it automatically: CD works.
+- The offline notebook [ryqn00/name-that-llm-submit](https://www.kaggle.com/code/ryqn00/name-that-llm-submit)
+  installed everything with internet off, predicted with `lr`, and validated before
+  writing. Then the first submission (ref 57601064).
+
+**Learned**
+- **CV 0.321 vs public LB 0.320.** The prompt-grouped backtest predicts the leaderboard
+  almost exactly, so we can trust local CV and spend fewer submissions.
+- **Kaggle mounted our dataset at `/kaggle/input/datasets/ryqn00/...`**, not the path the
+  plan assumed. Searching for the wheel instead of hard-coding the path saved the run.
+- **Kaggle's license list has no MIT.** It rejected `"MIT"` with a vague server error. The
+  plan's fallback was `other`, with MIT stated in the description.
+- **The leaderboard is far ahead:** median 0.512, top 10% at 0.632, best 0.703, among 3,012
+  teams. We're about 2,687th. A TF-IDF baseline is nowhere near enough. The big ideas
+  (prompt assignment, topic subtraction, transformer and LLM features) are the next plan.
+
+**Scores:** `lr`: CV **0.3212**, public LB **0.320**.
+
+**Next:** review this whole first plan, then write the P3 plan around the biggest gains.
+
 ## 2026-10-24 · Session 2e: five baselines and the first offline A/B test
 
 **Did**

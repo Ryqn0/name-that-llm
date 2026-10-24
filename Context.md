@@ -33,12 +33,14 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 ## Status
 
-- Phase: **P2 Backtest and baselines**.
-  - Done: P0, and P1 (the data layer and EDA). From P2: the five baseline models (Task 7)
-    and the backtesting core (Task 6: prompt-grouped folds, metrics, and the paired prompt
-    bootstrap written by the user).
-  - Next: the CV runner and W&B tracking (Task 8).
-  - Plan: [P0–P2](docs/superpowers/plans/2026-10-24-p0-p2-foundations-to-first-submission.md).
+- Phase: **P0–P2 complete.** The first leaderboard submission (2026-10-24) scored public
+  LB **0.320**, against CV 0.321, so **the backtest tracks the leaderboard**.
+  - Plan (done): [P0–P2](docs/superpowers/plans/2026-10-24-p0-p2-foundations-to-first-submission.md).
+  - **Leaderboard snapshot, 2026-10-24:** 3,012 teams; median 0.512; top-10% cutoff 0.632;
+    best 0.703. We're about 2,687th. The field is far ahead of the early public baselines
+    (0.35–0.40), so the next plan must go after the big gains: I-001 prompt assignment with
+    I-007 topic subtraction, then transformer and LLM features (I-002).
+  - Next: write the P3 plan.
 - Champion: **`lr`** (word + character TF-IDF with logistic regression). It has the best
   CV, and the bootstrap A/B test against `nbsvm` gives a 95% CI of [+0.008, +0.040], see
   the [baselines notebook](https://www.kaggle.com/code/ryqn00/name-that-llm-baselines).
@@ -46,7 +48,7 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 | date | model | CV | LB | W&B run |
 |---|---|---|---|---|
-| 2026-10-24 | lr | 0.3212 | (Task 11) | r0lx5cja |
+| 2026-10-24 | lr | 0.3212 | **0.320** | r0lx5cja |
 | 2026-10-24 | nbsvm | 0.2971 | — | sxhd09jf |
 | 2026-10-24 | mnb | 0.2852 | — | 7f8bv2zr |
 | 2026-10-24 | svm | 0.2848 | — | 5p2yum3r |
