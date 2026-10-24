@@ -40,7 +40,10 @@ outputs are a public repo, a progress diary, and a live demo app.
     best 0.703. We're about 2,687th. The field is far ahead of the early public baselines
     (0.35–0.40), so the next plan must go after the big gains: I-001 prompt assignment with
     I-007 topic subtraction, then transformer and LLM features (I-002).
-  - Next: write the P3 plan.
+  - **P3a done (2026-10-24): per-prompt assignment.** CV jumped 0.321 → 0.406, but the
+    **leaderboard A/B test showed no gain**: public LB 0.320 with assignment, against 0.320
+    without. The offline gain didn't transfer, so `ASSIGN` stays off until we understand
+    why (see IDEAS I-001). Plan: [P3a](docs/superpowers/plans/2026-10-24-p3a-prompt-assignment.md).
 - Champion: **`lr`** (word + character TF-IDF with logistic regression). It has the best
   CV, and the bootstrap A/B test against `nbsvm` gives a 95% CI of [+0.008, +0.040], see
   the [baselines notebook](https://www.kaggle.com/code/ryqn00/name-that-llm-baselines).
@@ -49,6 +52,7 @@ outputs are a public repo, a progress diary, and a live demo app.
 | date | model | CV | LB | W&B run |
 |---|---|---|---|---|
 | 2026-10-24 | lr | 0.3212 | **0.320** | r0lx5cja |
+| 2026-10-24 | lr + assign (topic groups) | 0.4056 | 0.320 | to8unxny |
 | 2026-10-24 | nbsvm | 0.2971 | — | sxhd09jf |
 | 2026-10-24 | mnb | 0.2852 | — | 7f8bv2zr |
 | 2026-10-24 | svm | 0.2848 | — | 5p2yum3r |
@@ -138,5 +142,6 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 ## Next steps
 
-1. The user writes the `prompt_bootstrap_ci` body (Task 6, user contribution).
-2. Task 8: CV runner and W&B tracking (the user creates a free W&B account).
+1. Find out why the assignment gain didn't transfer to the leaderboard (I-001).
+2. P3b: improve the base model itself (I-012 tuning, I-008 style features, M3
+   lab-then-model), since those gains don't depend on the hidden test's structure.
