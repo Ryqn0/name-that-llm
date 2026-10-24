@@ -60,6 +60,33 @@ def run_cv(cfg: ExperimentConfig, df: pd.DataFrame) -> CVResult:
     return CVResult(oof=oof, pred=pred, folds=folds, fold_scores=fold_scores, score=score(y, pred))
 
 
+def evaluate_assignment(result: CVResult, df: pd.DataFrame) -> dict[str, float]:
+    """The PUZZLE BACKTEST: how much does per-prompt assignment add on top of `result`?
+
+    Three numbers on the SAME out-of-fold probabilities:
+      plain:    argmax per passage (what run_cv already scores)
+      assigned: groups rebuilt from topic, exactly as we must do on the hidden test
+      oracle:   the true prompt_id groups (the best case, unreachable on the test)
+    plus `grouping_ari`, which measures how well the topic groups match the true prompts.
+    The gap between `assigned` and `oracle` is what better grouping could still win.
+    """
+    # Imported here to keep `import name_that_llm.train` light for the CLI's plain path.
+    from sklearn.metrics import adjusted_rand_score
+
+    from name_that_llm.assign import assign_labels
+    from name_that_llm.grouping import topic_groups
+
+    y = df["model"].to_numpy()
+    topic = topic_groups(df["text"].tolist())  # never looks at prompt_id or labels
+    oracle = pd.factorize(df["prompt_id"])[0]
+    return {
+        "plain": result.score,
+        "assigned": score(y, assign_labels(result.oof, topic)),
+        "oracle": score(y, assign_labels(result.oof, oracle)),
+        "grouping_ari": float(adjusted_rand_score(oracle, topic)),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Cross-validate one experiment config with prompt-grouped folds."
@@ -67,6 +94,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", required=True, help="config name (e.g. lr) or YAML path")
     parser.add_argument("--data-dir", type=Path, default=None, help="folder with train.csv")
     parser.add_argument("--track", action="store_true", help="log the run to Weights & Biases")
+    parser.add_argument(
+        "--assign", action="store_true", help="also score per-prompt assignment (puzzle backtest)"
+    )
     args = parser.parse_args(argv)
 
     cfg = load_config(args.config)
@@ -75,12 +105,18 @@ def main(argv: list[str] | None = None) -> int:
     print(f"{cfg.name}: balanced accuracy: {result.score:.4f}")
     print("per fold:", ", ".join(f"{s:.4f}" for s in result.fold_scores))
 
+    extra = None
+    if args.assign:
+        report = evaluate_assignment(result, df)
+        print("puzzle backtest:", ", ".join(f"{k} {v:.4f}" for k, v in report.items()))
+        extra = {f"puzzle_{k}": v for k, v in report.items()}
+
     if args.track:
         # Imported only when asked for. The offline submission path must never need
         # wandb installed or reachable (Review Focus 5).
         from name_that_llm.tracking import log_cv_run
 
-        print("W&B run id:", log_cv_run(cfg, result, df))
+        print("W&B run id:", log_cv_run(cfg, result, df, extra=extra))
     return 0
 
 
