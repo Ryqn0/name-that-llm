@@ -152,6 +152,17 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 ## Next steps
 
-1. P3b Task 5: the offline GPU submission of `lm_blend` (release v0.6.0, then the user's
-   OK to push and to submit). Keep it only if the public LB beats 0.320.
-2. P3b Task 6: Optuna tuning of the blend. Its code is already on branch `p3b-07-tuning`.
+State on 2026-10-25: v0.6.0 is released, and three runs were pushed to Kaggle with the
+user's OK: the GPU submission (`ryqn00/name-that-llm-submit` v3), the tuning notebook
+(`ryqn00/name-that-llm-tuning` v1) and the sweep's Findings re-run (v2).
+
+1. **Submit the blend** (P3b Task 5). It needs the user's go-ahead first: an unattended
+   auto-submit was blocked by the permission system. Check that v3 is COMPLETE and its
+   3-row output is valid, then run `kaggle competitions submit name-that-llm -k
+   ryqn00/name-that-llm-submit -v 3 -f submission.parquet -m "lr + LM blend (4b-base L6), v0.6.0"`.
+   Keep the blend only if the public LB beats 0.320, and record it on branch
+   `p3b-06-results`.
+2. **Collect the tuning run** (P3b Task 6): download `lm_blend_tuned.yaml` and fill in the
+   notebook's Findings. Promote the tuned config only if its CI lower bound against
+   `lm_blend` is above 0.
+3. Check that the sweep's v2 completed.
