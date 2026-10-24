@@ -1,0 +1,5 @@
+# Multinomial Naive Bayes: learns how often each model uses each n-gram.
+# The fastest baseline, and a classic for authorship attribution.
+name: mnb
+model: mnb
+alpha: 0.1

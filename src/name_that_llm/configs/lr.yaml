@@ -1,0 +1,5 @@
+# Logistic regression on TF-IDF: the standard strong linear text classifier.
+# C=4.0 means fairly light regularization (lots of features, few documents).
+name: lr
+model: lr
+C: 4.0

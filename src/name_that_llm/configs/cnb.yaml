@@ -1,0 +1,5 @@
+# Complement Naive Bayes: learns from every class EXCEPT the one being scored.
+# Often more stable than Multinomial NB on text.
+name: cnb
+model: cnb
+alpha: 0.1
