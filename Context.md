@@ -159,10 +159,20 @@ CV = the seed-42 folds, the same for every row.
 
 ## Next steps
 
-1. **P5:** work through the [plan](docs/superpowers/plans/2026-10-25-p5-encoders.md)'s
-   seven tasks. Progress lives in the ledger,
-   `.superpowers/sdd/2026-10-25-p5-encoders/progress.md`.
-2. **Then P4, App v1 and CD:** real-time inference, Docker, CD, a model card, and a live
+State on 2026-10-26: P5 Tasks 1–3 are merged (PRs #22–#24), so the whole library is on
+`main`. The first GPU notebook, `ryqn00/name-that-llm-encoder-select` (v1, DeBERTa-v3 vs
+ModernBERT), was pushed with the user's OK and is running. Progress lives in the ledger,
+`.superpowers/sdd/2026-10-25-p5-encoders/progress.md`.
+
+1. **Collect 07's results** (P5 Task 4):
+   - Download its outputs and record the winner, plus both CVs against `lr`'s 0.3304 on
+     the seed-7 folds.
+   - Fill in the Findings cell, then ship branch `p5-04-select`.
+2. **Tasks 5 and 6**, the tuning and final GPU notebooks:
+   - The user pre-approved pushing them on 2026-10-26. Approval doesn't carry over between
+     sessions, so confirm once before pushing.
+   - The submission (Task 7) always needs its own OK.
+3. **Then P4, App v1 and CD:** real-time inference, Docker, CD, a model card, and a live
    demo serving the champion.
 3. Cheap follow-ups: I-015 (calibrated or log blend, in P7's M6 ensemble), I-017 (TF
    without IDF), I-018 (the weight grid inside each Optuna trial).
