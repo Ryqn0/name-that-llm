@@ -1,0 +1,9 @@
+# DeBERTa-v3-base (Microsoft, MIT license): 184M parameters, the classic strong encoder for
+# Kaggle text classification. Its "disentangled" attention keeps content and position
+# apart, at the cost of more memory than BERT.
+# batch_size 8: at 512 tokens, 16 risks overflowing a T4's 16 GB; 8 is the safe choice.
+# lr 2e-5: the usual peak learning rate for fine-tuning base-size DeBERTa.
+name: deberta_v3_base
+base_model: microsoft/deberta-v3-base
+batch_size: 8
+lr: 2.0e-5

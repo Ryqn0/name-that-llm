@@ -1,0 +1,10 @@
+# ModernBERT-base (Answer.AI, Apache 2.0): 149M parameters, a 2024 encoder trained on 2
+# trillion tokens of modern text. It's lighter on memory than DeBERTa, and its byte-level
+# tokenizer keeps every character (curly quotes, em dashes), which are style clues here.
+# batch_size 16: fits a T4 at 512 tokens.
+# lr 5e-5: ModernBERT's authors found that it fine-tunes best at higher learning rates
+# than DeBERTa.
+name: modernbert_base
+base_model: answerdotai/ModernBERT-base
+batch_size: 16
+lr: 5.0e-5

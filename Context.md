@@ -36,9 +36,11 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 ## Status
 
-- Phase: **P3 complete**: P3a (prompt assignment) and P3b (LM features, then tuning,
-  [plan](docs/superpowers/plans/2026-10-24-p3b-lm-features.md)). Next: choose the next
-  plan with the user (see Next steps).
+- Phase: **P5 in progress**: fine-tuned encoders, DeBERTa-v3-base vs ModernBERT-base
+  ([plan](docs/superpowers/plans/2026-10-25-p5-encoders.md)). The user chose the order
+  P5, then P4, on 2026-10-25.
+  - Before that, P3 was completed: P3a (prompt assignment) and P3b (LM features, then
+    tuning, [plan](docs/superpowers/plans/2026-10-24-p3b-lm-features.md)).
 - **Lessons so far:**
   - P0–P2: public LB **0.320** against CV 0.321, so **the backtest tracks the leaderboard**.
   - P3a: per-prompt assignment lifted CV from 0.321 to 0.406, but the LB stayed at 0.320.
@@ -157,10 +159,10 @@ CV = the seed-42 folds, the same for every row.
 
 ## Next steps
 
-1. **Choose the next plan** with the user:
-   - **P4, App v1 and CD** (the design's next phase): real-time inference, Docker, CD, a
-     model card, and a live demo serving the champion.
-   - **P5, transformers:** fine-tune an encoder on GPU. It's the design's biggest
-     leaderboard lever: the median is 0.526, and we're at 0.389.
-2. Cheap follow-ups that fit into either plan: I-015 (calibrated or log blend), I-017 (TF
+1. **P5:** work through the [plan](docs/superpowers/plans/2026-10-25-p5-encoders.md)'s
+   seven tasks. Progress lives in the ledger,
+   `.superpowers/sdd/2026-10-25-p5-encoders/progress.md`.
+2. **Then P4, App v1 and CD:** real-time inference, Docker, CD, a model card, and a live
+   demo serving the champion.
+3. Cheap follow-ups: I-015 (calibrated or log blend, in P7's M6 ensemble), I-017 (TF
    without IDF), I-018 (the weight grid inside each Optuna trial).

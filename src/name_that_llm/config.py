@@ -58,6 +58,28 @@ class BlendConfig(BaseModel):
     seed: int = 42
 
 
+class EncoderConfig(BaseModel):
+    """A transformer encoder fine-tuned end to end as an 18-way classifier (P5, M4).
+
+    Unlike the LM features of P3b, where Qwen stayed frozen, fine-tuning updates EVERY
+    weight of the network for our task. The defaults are common starting points for
+    base-size encoders on small datasets. Optuna tunes lr, epochs and warmup_ratio.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    base_model: str  # Hugging Face Hub id, or a folder holding a saved model
+    max_length: int = 512  # tokens per passage: ours fit, and longer ones get truncated
+    batch_size: int = 16  # bounded by GPU memory: 16 GB on a T4
+    lr: float = 2e-5  # peak learning rate: pretrained weights need small steps
+    epochs: int = 3  # FIXED, never early-stopped on the validation fold (honest OOF)
+    warmup_ratio: float = 0.1  # share of steps where the lr ramps up from 0
+    weight_decay: float = 0.01  # mild L2-style shrinkage, the usual for AdamW fine-tuning
+    n_splits: int = 5
+    seed: int = 42
+
+
 def load_config(name_or_path: str | Path, model_cls: type[BaseModel] = ExperimentConfig):
     """Load a config by NAME (a file shipped inside the package) or by PATH (any YAML file).
 
