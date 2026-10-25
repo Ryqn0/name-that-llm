@@ -1,7 +1,13 @@
 import pytest
 from pydantic import ValidationError
 
-from name_that_llm.config import BlendConfig, EncoderConfig, ExperimentConfig, load_config
+from name_that_llm.config import (
+    BlendConfig,
+    EncoderConfig,
+    EnsembleConfig,
+    ExperimentConfig,
+    load_config,
+)
 
 
 def test_load_config_by_name_and_by_path(tmp_path):
@@ -26,6 +32,15 @@ def test_blend_config_round_trips_and_validates_weight(tmp_path):
     assert cfg.layer == 6 and cfg.text_config == "lr" and cfg.seed == 42
     with pytest.raises(ValidationError):
         BlendConfig(name="x", lm_variation="1.7b-base", layer=1, weight=1.5)
+
+
+def test_ensemble_config_validates_weights():
+    cfg = EnsembleConfig(name="e", weights=(0.5, 0.2, 0.3))
+    assert cfg.blend == "lm_blend" and cfg.encoder == "encoder"
+    with pytest.raises(ValidationError):  # a negative weight
+        EnsembleConfig(name="e", weights=(0.5, -0.1, 0.6))
+    with pytest.raises(ValidationError):  # one weight per model: text, LM head, encoder
+        EnsembleConfig(name="e", weights=(0.5, 0.5))
 
 
 def test_shipped_encoder_configs_load():
