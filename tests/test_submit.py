@@ -5,9 +5,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from name_that_llm.config import BlendConfig, load_config
+from name_that_llm.config import BlendConfig, EnsembleConfig, load_config
 from name_that_llm.data import LABELS, load_test
-from name_that_llm.submit import predict_submission, predict_submission_blend
+from name_that_llm.submit import (
+    predict_submission,
+    predict_submission_blend,
+    predict_submission_ensemble,
+)
 
 
 def _cfg():
@@ -75,3 +79,41 @@ def test_predict_submission_blend_rejects_misaligned_features(fake_train, fake_d
         predict_submission_blend(
             _cfg(), bcfg, fake_train, load_test(fake_data_dir), np.zeros((5, 8)), np.zeros((3, 8))
         )
+
+
+def _ensemble(fake_train, fake_data_dir, weights, p_encoder=None):
+    """predict_submission_ensemble on the fake data, with random LM features."""
+    test = load_test(fake_data_dir)
+    rng = np.random.default_rng(0)
+    if p_encoder is None:
+        p_encoder = rng.dirichlet(np.ones(18), size=len(test))
+    sub = predict_submission_ensemble(
+        _cfg(),
+        BlendConfig(name="b", lm_variation="x", layer=0, weight=0.5),
+        EnsembleConfig(name="e", weights=weights),
+        fake_train,
+        test,
+        rng.normal(size=(len(fake_train), 8)),
+        rng.normal(size=(len(test), 8)),
+        p_encoder,
+    )
+    return sub, test, p_encoder
+
+
+def test_predict_submission_ensemble_text_weight_only_equals_text_only(fake_train, fake_data_dir):
+    sub, test, _ = _ensemble(fake_train, fake_data_dir, (1.0, 0.0, 0.0))
+    assert sub["model"].tolist() == predict_submission(_cfg(), fake_train, test)["model"].tolist()
+
+
+def test_predict_submission_ensemble_encoder_weight_only_follows_the_encoder(
+    fake_train, fake_data_dir
+):
+    sub, _, p_encoder = _ensemble(fake_train, fake_data_dir, (0.0, 0.0, 1.0))
+    assert sub["model"].tolist() == [LABELS[i] for i in p_encoder.argmax(axis=1)]
+
+
+def test_predict_submission_ensemble_rejects_misaligned_encoder_probabilities(
+    fake_train, fake_data_dir
+):
+    with pytest.raises(ValueError):  # 2 rows of encoder probabilities for 3 test rows
+        _ensemble(fake_train, fake_data_dir, (0.4, 0.3, 0.3), p_encoder=np.full((2, 18), 1 / 18))

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, NonNegativeFloat
 
 
 class ExperimentConfig(BaseModel):
@@ -78,6 +78,23 @@ class EncoderConfig(BaseModel):
     weight_decay: float = 0.01  # mild L2-style shrinkage, the usual for AdamW fine-tuning
     n_splits: int = 5
     seed: int = 42
+
+
+class EnsembleConfig(BaseModel):
+    """Three models mixed by a weighted mean of probabilities (P5).
+
+    The two models of the BlendConfig `blend` (its text model and its LM head) plus the
+    fine-tuned EncoderConfig `encoder`. The blend's own weight is ignored: all three
+    weights are chosen together, on seed-7 folds (blend.best_blend_weights).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    blend: str = "lm_blend"  # the BlendConfig whose text model and LM head are reused
+    encoder: str = "encoder"  # the EncoderConfig of the fine-tuned encoder
+    # text model, LM head, encoder, in that order. blend() normalizes them to sum to 1.
+    weights: tuple[NonNegativeFloat, NonNegativeFloat, NonNegativeFloat]
 
 
 def load_config(name_or_path: str | Path, model_cls: type[BaseModel] = ExperimentConfig):

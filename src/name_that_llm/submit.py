@@ -14,7 +14,7 @@ import pandas as pd
 
 from name_that_llm.assign import assign_labels
 from name_that_llm.blend import blend
-from name_that_llm.config import BlendConfig, ExperimentConfig
+from name_that_llm.config import BlendConfig, EnsembleConfig, ExperimentConfig
 from name_that_llm.grouping import topic_groups
 from name_that_llm.labels import LABELS
 from name_that_llm.models import build_dense_model, build_model
@@ -53,12 +53,35 @@ def predict_submission(
     which the leaderboard A/B test checks.
     """
     proba = predict_proba_test(cfg, train, test)
-    if assign:
-        labels = assign_labels(proba, topic_groups(test["text"].tolist()))
-    else:
-        labels = np.asarray(LABELS)[proba.argmax(axis=1)]
+    if not assign:
+        return _submission(proba, test)
+    labels = assign_labels(proba, topic_groups(test["text"].tolist()))
     sub = pd.DataFrame({"id": test["id"].to_numpy(), "model": labels})
     return validate_submission(sub, test["id"])
+
+
+def _submission(proba: np.ndarray, test: pd.DataFrame) -> pd.DataFrame:
+    """The most probable label of each row, as a validated (id, model) submission."""
+    sub = pd.DataFrame(
+        {"id": test["id"].to_numpy(), "model": np.asarray(LABELS)[proba.argmax(axis=1)]}
+    )
+    return validate_submission(sub, test["id"])
+
+
+def _check_lm_rows(train, test, lm_train, lm_test) -> None:
+    # A length mismatch means rows can't be matched to passages: refuse rather than
+    # silently pair features with the wrong passages.
+    if len(lm_train) != len(train) or len(lm_test) != len(test):
+        raise ValueError(
+            f"LM features don't match the data: {len(lm_train)} vs {len(train)} train rows, "
+            f"{len(lm_test)} vs {len(test)} test rows"
+        )
+
+
+def _lm_proba(C: float, train: pd.DataFrame, lm_train, lm_test) -> np.ndarray:
+    """The LM head (scaled logistic regression), fit on all of train: test probabilities."""
+    head = build_dense_model(C).fit(lm_train, train["model"])
+    return _aligned_proba(head, lm_test)
 
 
 def predict_submission_blend(
@@ -75,18 +98,33 @@ def predict_submission_blend(
     and `test`), computed in the notebook with lm.pooled_hidden_states + lm.select_layers.
     This module stays torch-free: it only sees the resulting arrays.
     """
-    if len(lm_train) != len(train) or len(lm_test) != len(test):
-        # A length mismatch means rows can't be matched to passages: refuse rather than
-        # silently pair features with the wrong passages.
-        raise ValueError(
-            f"LM features don't match the data: {len(lm_train)} vs {len(train)} train rows, "
-            f"{len(lm_test)} vs {len(test)} test rows"
-        )
+    _check_lm_rows(train, test, lm_train, lm_test)
     p_text = predict_proba_test(text_cfg, train, test)
-    head = build_dense_model(blend_cfg.C).fit(lm_train, train["model"])
-    p_lm = _aligned_proba(head, lm_test)
-    mixed = blend([p_text, p_lm], [1 - blend_cfg.weight, blend_cfg.weight])
-    sub = pd.DataFrame(
-        {"id": test["id"].to_numpy(), "model": np.asarray(LABELS)[mixed.argmax(axis=1)]}
-    )
-    return validate_submission(sub, test["id"])
+    p_lm = _lm_proba(blend_cfg.C, train, lm_train, lm_test)
+    return _submission(blend([p_text, p_lm], [1 - blend_cfg.weight, blend_cfg.weight]), test)
+
+
+def predict_submission_ensemble(
+    text_cfg: ExperimentConfig,
+    blend_cfg: BlendConfig,
+    ens_cfg: EnsembleConfig,
+    train: pd.DataFrame,
+    test: pd.DataFrame,
+    lm_train: np.ndarray,
+    lm_test: np.ndarray,
+    p_encoder: np.ndarray,
+) -> pd.DataFrame:
+    """The P5 submission: the text model, the LM head and a fine-tuned encoder, blended.
+
+    `p_encoder` holds the encoder's (n_test, 18) probabilities: the mean of its 5 fold
+    models (encoder.predict_proba_folds). The notebook computes it, so this module stays
+    torch-free like the LM features. `blend_cfg` supplies the LM head's C; its own weight
+    is ignored, since `ens_cfg.weights` sets all three shares together.
+    """
+    _check_lm_rows(train, test, lm_train, lm_test)
+    expected = (len(test), len(LABELS))
+    if np.shape(p_encoder) != expected:
+        raise ValueError(f"encoder probabilities have shape {np.shape(p_encoder)}, not {expected}")
+    p_text = predict_proba_test(text_cfg, train, test)
+    p_lm = _lm_proba(blend_cfg.C, train, lm_train, lm_test)
+    return _submission(blend([p_text, p_lm, p_encoder], ens_cfg.weights), test)
