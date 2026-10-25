@@ -36,28 +36,33 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 ## Status
 
-- Phase: **P3b in progress**, "LM features, then tune"
-  ([plan](docs/superpowers/plans/2026-10-24-p3b-lm-features.md)). Tasks 1–4 are done.
-  - **Task 4 (2026-10-24):** `lr` blended with Qwen 3 4B layers 6–9 beats `lr` by +0.084 on
-    fresh folds (95% CI [+0.066, +0.101]), so it's **promoted to the leaderboard A/B**.
-    See the [sweep notebook](https://www.kaggle.com/code/ryqn00/name-that-llm-lm-layer-sweep).
-  - Next: Task 5, the GPU submission of `lm_blend`, then Task 6, Optuna tuning.
+- Phase: **P3 complete**: P3a (prompt assignment) and P3b (LM features, then tuning,
+  [plan](docs/superpowers/plans/2026-10-24-p3b-lm-features.md)). Next: choose the next
+  plan with the user (see Next steps).
 - **Lessons so far:**
   - P0–P2: public LB **0.320** against CV 0.321, so **the backtest tracks the leaderboard**.
   - P3a: per-prompt assignment lifted CV from 0.321 to 0.406, but the LB stayed at 0.320.
     The gain depends on the test's layout (+0.084 at 18 answers per prompt, about 0 at
     1–3), so prompt-structure tricks (I-001, I-007) are shelved. The base model is the
     lever.
-- **Leaderboard snapshot, 2026-10-24:** 3,012 teams; median 0.512; top-10% cutoff 0.632;
-  best 0.703. We're about 2,687th.
-- Champion: **`lr`** (word + character TF-IDF with logistic regression), chosen with the
-  user on 2026-10-24. Its bootstrap A/B against `nbsvm` gives a 95% CI of [+0.008, +0.040],
-  see the [baselines notebook](https://www.kaggle.com/code/ryqn00/name-that-llm-baselines).
-  - **Challenger: `lm_blend`.** It replaces `lr` only if its public LB beats 0.320.
+  - P3b: Qwen 3 hidden states work. Blended with `lr`, they reach a CV of 0.402 (the mean
+    of three fresh seeds) and **public LB 0.389** (+0.069). The CV–LB gap widened from
+    −0.001 to −0.013, so watch it. Optuna didn't beat the hand-made sweep (I-012, I-018).
+- **Leaderboard snapshot, 2026-10-25:** 3,231 teams; median 0.526; top-10% cutoff 0.639;
+  best 0.703. We're about 2,219th (from about 2,687th on 2026-10-24).
+- Champion: **`lm_blend`** (since 2026-10-25): `lr`, the word + character TF-IDF logistic
+  regression, blended with a logistic regression on Qwen 3 4B base layers 6–9 at LM weight
+  0.1.
+  - It beat `lr` on fresh folds (+0.084, 95% CI [+0.066, +0.101]) and on the public LB
+    (0.389 vs 0.320).
+  - The offline submission runs it on a T4 GPU in about 20 minutes.
+
+CV = the seed-42 folds, the same for every row.
 
 | date | model | CV | LB | W&B run |
 |---|---|---|---|---|
-| 2026-10-24 | lm_blend (lr + Qwen 3 4B layers 6–9) | ≈ 0.405 | pending | — |
+| 2026-10-25 | **lm_blend** (lr + Qwen 3 4B layers 6–9) | 0.4052 | **0.389** | — |
+| 2026-10-25 | lm_blend_tuned (Optuna's best, not promoted) | 0.3963 | — | — |
 | 2026-10-24 | lr | 0.3212 | **0.320** | r0lx5cja |
 | 2026-10-24 | lr + assign (topic groups) | 0.4056 | 0.320 | to8unxny |
 | 2026-10-24 | nbsvm | 0.2971 | — | sxhd09jf |
@@ -152,17 +157,10 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 ## Next steps
 
-State on 2026-10-25: v0.6.0 is released, and three runs were pushed to Kaggle with the
-user's OK: the GPU submission (`ryqn00/name-that-llm-submit` v3), the tuning notebook
-(`ryqn00/name-that-llm-tuning` v1) and the sweep's Findings re-run (v2).
-
-1. **Submit the blend** (P3b Task 5). It needs the user's go-ahead first: an unattended
-   auto-submit was blocked by the permission system. Check that v3 is COMPLETE and its
-   3-row output is valid, then run `kaggle competitions submit name-that-llm -k
-   ryqn00/name-that-llm-submit -v 3 -f submission.parquet -m "lr + LM blend (4b-base L6), v0.6.0"`.
-   Keep the blend only if the public LB beats 0.320, and record it on branch
-   `p3b-06-results`.
-2. **Collect the tuning run** (P3b Task 6): download `lm_blend_tuned.yaml` and fill in the
-   notebook's Findings. Promote the tuned config only if its CI lower bound against
-   `lm_blend` is above 0.
-3. Check that the sweep's v2 completed.
+1. **Choose the next plan** with the user:
+   - **P4, App v1 and CD** (the design's next phase): real-time inference, Docker, CD, a
+     model card, and a live demo serving the champion.
+   - **P5, transformers:** fine-tune an encoder on GPU. It's the design's biggest
+     leaderboard lever: the median is 0.526, and we're at 0.389.
+2. Cheap follow-ups that fit into either plan: I-015 (calibrated or log blend), I-017 (TF
+   without IDF), I-018 (the weight grid inside each Optuna trial).
