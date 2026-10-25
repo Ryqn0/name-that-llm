@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from name_that_llm.config import BlendConfig, ExperimentConfig, load_config
+from name_that_llm.config import BlendConfig, EncoderConfig, ExperimentConfig, load_config
 
 
 def test_load_config_by_name_and_by_path(tmp_path):
@@ -26,6 +26,17 @@ def test_blend_config_round_trips_and_validates_weight(tmp_path):
     assert cfg.layer == 6 and cfg.text_config == "lr" and cfg.seed == 42
     with pytest.raises(ValidationError):
         BlendConfig(name="x", lm_variation="1.7b-base", layer=1, weight=1.5)
+
+
+def test_shipped_encoder_configs_load():
+    # The GPU notebooks download base_model from the Hugging Face Hub: a typo in the id
+    # would only surface on Kaggle, after the GPU session has started.
+    for name, base in [
+        ("deberta_v3_base", "microsoft/deberta-v3-base"),
+        ("modernbert_base", "answerdotai/ModernBERT-base"),
+    ]:
+        cfg = load_config(name, model_cls=EncoderConfig)
+        assert cfg.name == name and cfg.base_model == base and cfg.seed == 42
 
 
 def test_shipped_lm_blend_config_loads_with_its_text_config():

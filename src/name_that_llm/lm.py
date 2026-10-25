@@ -49,7 +49,6 @@ def load_lm(model_dir: Path, device: str | None = None, dtype: str = "auto"):
     """
     import torch
     import transformers
-    from packaging.version import Version
 
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     torch_dtype = {
@@ -65,12 +64,23 @@ def load_lm(model_dir: Path, device: str | None = None, dtype: str = "auto"):
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"  # see pooled_hidden_states for why
 
-    # transformers 4.56 renamed `torch_dtype` to `dtype`; Kaggle's image decides which applies.
-    dtype_key = "dtype" if Version(transformers.__version__) >= Version("4.56") else "torch_dtype"
     model = transformers.AutoModel.from_pretrained(
-        model_dir, local_files_only=True, **{dtype_key: torch_dtype}
+        model_dir, local_files_only=True, **_dtype_kwargs(torch_dtype)
     )
     return model.to(device).eval(), tokenizer
+
+
+def _dtype_kwargs(torch_dtype) -> dict:
+    """The keyword for the weights' dtype in `from_pretrained`: `dtype`, or `torch_dtype`.
+
+    transformers 4.56 renamed `torch_dtype` to `dtype`, and Kaggle's image decides which
+    version applies. Shared by load_lm and encoder.load_encoder.
+    """
+    import transformers
+    from packaging.version import Version
+
+    key = "dtype" if Version(transformers.__version__) >= Version("4.56") else "torch_dtype"
+    return {key: torch_dtype}
 
 
 def pooled_hidden_states(
