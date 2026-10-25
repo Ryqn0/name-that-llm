@@ -1,0 +1,15 @@
+{
+  "id": "ryqn00/name-that-llm-encoder-select",
+  "title": "Name That LLM - Encoder select",
+  "code_file": "encoder_select.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": false,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": ["name-that-llm"],
+  "kernel_sources": [],
+  "model_sources": []
+}
