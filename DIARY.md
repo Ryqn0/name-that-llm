@@ -2,6 +2,41 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-10-25 · Session 5: the LM blend reaches the leaderboard (P3b, tasks 5–6)
+
+**Did**
+- Released v0.6.0. The offline submission notebook now extracts Qwen 3 4B's layers 6–9 on
+  Kaggle's T4 GPU, for train and test in the same run, and blends them with `lr`.
+- Submitted it. The GPU run took 22 minutes, and its runtime check estimated the hidden
+  rerun at 18.6 minutes (the limit is 9 hours).
+- Ran 60 Optuna trials over the blend's five knobs (81 minutes on CPU), then re-measured
+  the winner on fresh folds
+  ([tuning notebook](https://www.kaggle.com/code/ryqn00/name-that-llm-tuning)).
+
+**Learned**
+- **The leaderboard confirms the LM features: public LB 0.389**, up from 0.320 (+0.069).
+  CV had promised +0.084, so it still ranks the models correctly.
+- **The CV–LB gap widened**, from −0.001 for `lr` to −0.013 for the blend (CV 0.402, the
+  mean of three fresh seeds). One number can't tell leaderboard noise from a real shift,
+  so keep watching the gap as the models get more complex.
+- **Tuning lost to the hand-made sweep.** Optuna's best scored 0.4012 on the seed-7 folds,
+  below `lm_blend`'s 0.4038 there, and the gap held on fresh folds (0.3978 vs 0.4023). The
+  budgets were similar (67 CVs against 60 trials), but the sweep chose the blend weight on
+  a nearly free grid, while Optuna spent whole trials on bad weights (new idea I-018).
+- **Confirmed: the LM head is far more confident than `lr`.** Its average top probability
+  is 0.666, against 0.147 for `lr`, which is why a weight of 0.1 is enough (I-015).
+- **Selection bias was small:** `lm_blend` lost only 0.0015 between the folds that chose
+  it and fresh ones.
+- **The permission system blocked an unattended auto-submit.** A submission is visible
+  and uses a daily quota, so it's sent only in the foreground, right after an explicit OK.
+
+**Scores:** `lm_blend`: CV 0.4023 (mean of seeds 42–44), **public LB 0.389**, the new
+champion. Leaderboard on 2026-10-25: 3,231 teams, median 0.526, top-10% cutoff 0.639, best
+0.703. We're about 2,219th, up from about 2,687th.
+
+**Next:** P3b is done. The median (0.526) is still far ahead, so the next plan must find
+much bigger gains.
+
 ## 2026-10-24 → 25 · Session 4: LLM hidden states beat TF-IDF (P3b, tasks 1–4)
 
 **Did**
