@@ -14,7 +14,9 @@
   "competition_sources": [
     "name-that-llm"
   ],
-  "kernel_sources": [],
+  "kernel_sources": [
+    "ryqn00/name-that-llm-encoder-final"
+  ],
   "model_sources": [
     "qwen-lm/qwen-3/transformers/4b-base/1"
   ]
