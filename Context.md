@@ -130,6 +130,10 @@ CV = the seed-42 folds, the same for every row.
 - **Lesson (P3a):** before trusting any trick that exploits prompt structure, re-measure
   it on subsampled layouts (m = 1, 2, 3, 6 answers per prompt), because the hidden test
   is not laid out like train.
+- **Journal:** before a plan's scratch workspace is deleted, its step-by-step record goes
+  to `docs/journal/<phase>.md`: the steps, how each was checked, what broke and the fix,
+  and every judgment call. [docs/journal/README.md](docs/journal/README.md) maps where
+  each part of the record lives, including the session transcripts.
 - **Attribution:** commit messages end with
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. PR bodies end with
   `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
