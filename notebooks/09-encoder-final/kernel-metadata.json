@@ -1,0 +1,15 @@
+{
+  "id": "ryqn00/name-that-llm-encoder-final",
+  "title": "Name That LLM - Encoder final",
+  "code_file": "encoder_final.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": false,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": ["name-that-llm"],
+  "kernel_sources": ["ryqn00/name-that-llm-lm-features"],
+  "model_sources": []
+}
