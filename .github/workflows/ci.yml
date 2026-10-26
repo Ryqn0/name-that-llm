@@ -76,4 +76,4 @@ jobs:
       - run: uv run --no-sync python -c "import torch, transformers"
       - run: >-
           uv run --no-sync pytest -q tests/test_lm.py tests/test_encoder.py tests/test_tune.py
-          tests/test_champion.py
+          tests/test_champion.py tests/test_registry.py

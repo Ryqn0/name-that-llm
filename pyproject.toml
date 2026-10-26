@@ -28,6 +28,11 @@ track = [
 tune = [
     "optuna>=3.6",
 ]
+# The live app (P4): MLflow packages the champion and loads it from the registry. Never
+# needed by the offline submission notebook, which installs the base package only.
+serve = [
+    "mlflow>=3.1",
+]
 
 [build-system]
 requires = ["uv_build>=0.11.16,<0.12.0"]
