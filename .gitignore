@@ -21,3 +21,6 @@ submission.parquet
 
 # Claude Code workflow scratch (plan ledgers, brainstorming mockups): local only
 .superpowers/
+
+# Written by the deploy (scripts/deploy_space.py) into the staged copy only, never committed
+src/name_that_llm/BUILD_COMMIT
