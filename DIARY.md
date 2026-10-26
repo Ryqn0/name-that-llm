@@ -2,6 +2,48 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-10-25 → 26 · Session 6: a fine-tuned encoder joins the ensemble (P5)
+
+**Did**
+- Wrote `encoder.py`: a hand-written PyTorch fine-tuning loop (ADR 0003) with mixed
+  precision, a warmup then linear decay, gradient clipping, and a hard stop on a
+  non-finite loss. CV trains a fresh pretrained model per fold, and the offline helpers
+  find and average the 5 saved fold models.
+- Added an Optuna study for encoders (warm start, fold-level pruning), an exact search for
+  N blend weights, `EncoderConfig` and `EnsembleConfig`, and the ensemble submission. A new
+  CI job installs CPU-only torch, so the 21 model tests run on every PR.
+- Ran three GPU notebooks on Kaggle: the head-to-head
+  ([07](https://www.kaggle.com/code/ryqn00/name-that-llm-encoder-select)), the tuning
+  ([08](https://www.kaggle.com/code/ryqn00/name-that-llm-encoder-tune)), and the final
+  training on four fold seeds with the A/B gate
+  ([09](https://www.kaggle.com/code/ryqn00/name-that-llm-encoder-final)).
+- Released v0.7.0 and submitted the three-model ensemble.
+
+**Learned**
+- **ModernBERT-base beat DeBERTa-v3-base clearly:** seed-7 CV 0.344 against 0.206. Even
+  at ModernBERT's settings DeBERTa scored only 0.171, and one of its folds never left the
+  uniform guess.
+- **A weaker model can still help.** Alone, the tuned encoder scores 0.353 on fresh folds,
+  between `lr` (0.325) and `lm_blend` (0.402). Yet a 15% share lifts the blend by +0.021,
+  because its mistakes differ: it reads the raw text end to end, while the other two are
+  linear models on fixed features.
+- **The leaderboard confirms it: public LB 0.410**, +0.021 over 0.389, the same gain as on
+  fresh folds. The CV–LB gap held at −0.013.
+- **Fine-tuning is noisy.** The same config, folds and seed scored 0.374 in the tuning run
+  and 0.360 in the final one: GPU training isn't bit-for-bit reproducible. So half of the
+  tuning's +0.030 was luck (new idea I-022).
+- **Pruning paid off, but the sampler never learned.** 7 of 10 trials stopped after one
+  fold. TPE draws its first 10 trials at random by default, so a 10-trial search is a
+  random search (I-020).
+- **W&B was off in every GPU run:** reading the Kaggle Secret raised `ConnectionError`, so
+  P5 has no W&B runs. Tracking is optional by design, so nothing broke, but it needs a fix.
+
+**Scores:** `ensemble`: CV 0.4231 (mean of seeds 42–44), **public LB 0.410**, the new
+champion. Leaderboard on 2026-10-26: 3,387 teams, median 0.532, top-10% cutoff 0.641, best
+0.710. We're about 2,236th. P5 used about 4.1 GPU-hours.
+
+**Next:** P4, App v1 and CD.
+
 ## 2026-10-25 · Session 5: the LM blend reaches the leaderboard (P3b, tasks 5–6)
 
 **Did**
