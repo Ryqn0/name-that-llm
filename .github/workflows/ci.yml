@@ -77,3 +77,22 @@ jobs:
       - run: >-
           uv run --no-sync pytest -q tests/test_lm.py tests/test_encoder.py tests/test_tune.py
           tests/test_champion.py tests/test_registry.py
+
+  # The live app's image (P4): it must build, carry Kaggle's torch and transformers (the
+  # versions the champion was trained and checked with), import the app, and never contain
+  # the competition data.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # A stand-in for the competition data, where a real checkout keeps it. The last step
+      # fails if this file is found anywhere in the image.
+      - run: mkdir -p data/raw && echo "not real data" > data/raw/SENTINEL_competition_data.csv
+      - run: docker build -f app/Dockerfile -t ntl-app .
+      - run: |
+          versions=$(docker run --rm ntl-app python -c "import name_that_llm.serve, torch, transformers; print(torch.__version__, transformers.__version__)")
+          echo "$versions"
+          test "$versions" = "2.11.0+cpu 5.16.1"
+      - run: >-
+          docker run --rm ntl-app sh -c
+          '! find / -name SENTINEL_competition_data.csv -print -quit 2>/dev/null | grep -q .'

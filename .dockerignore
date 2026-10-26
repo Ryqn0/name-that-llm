@@ -1,0 +1,14 @@
+# The Docker build context: what `docker build` may send to the builder. The Dockerfile
+# copies only named files anyway; this keeps the rest from even leaving the machine, and
+# above all the competition data (data/), which the rules forbid redistributing.
+data/
+.git/
+.venv/
+.superpowers/
+notebooks/
+tests/
+docs/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
