@@ -45,6 +45,9 @@ outputs are a public repo, a progress diary, and a live demo app.
     - DeBERTa underfit at its default lr, so notebook 08 re-checks it at ModernBERT's
       settings before tuning.
     - Kaggle's T4 accelerator provides **2 GPUs**; we use one so far (I-019).
+  - **Task 5 (2026-10-26):** the rematch confirmed ModernBERT: DeBERTa at its settings
+    scored 0.171. Tuning on two folds chose lr 4.4e-5 and **5 epochs** (0.374 against the
+    default's 0.344), saved as `configs/encoder.yaml`.
   - Before that, P3 was completed: P3a (prompt assignment) and P3b (LM features, then
     tuning, [plan](docs/superpowers/plans/2026-10-24-p3b-lm-features.md)).
 - **Lessons so far:**
@@ -165,14 +168,13 @@ CV = the seed-42 folds, the same for every row.
 
 ## Next steps
 
-State on 2026-10-26: P5 Tasks 1–4 are done. The library is on `main` (PRs #22–#24), and
-07-encoder-select ran: ModernBERT-base wins. Progress lives in the ledger,
-`.superpowers/sdd/2026-10-25-p5-encoders/progress.md`, and the notebook builders are in its
-`scripts/` folder.
+State on 2026-10-26: P5 Tasks 1–5 are done: the library (PRs #22–#24), 07-encoder-select
+(ModernBERT-base wins) and 08-encoder-tune (`configs/encoder.yaml`). Progress lives in the
+ledger, `.superpowers/sdd/2026-10-25-p5-encoders/progress.md`, and the notebook builders
+are in its `scripts/` folder.
 
-1. **Tasks 5 and 6**, the tuning (08) and final (09) GPU notebooks:
-   - 08 first re-runs DeBERTa at ModernBERT's settings, then tunes whichever scores
-     higher.
+1. **Task 6**, the final GPU notebook (09): 4 fold seeds, the ensemble with `lm_blend`,
+   and the A/B gate.
    - Push only after the user's OK in the current session: approvals don't carry over
      between sessions.
    - The submission (Task 7) always needs its own OK.
