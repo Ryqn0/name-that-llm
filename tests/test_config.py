@@ -62,6 +62,16 @@ def test_shipped_encoder_config_loads():
     assert cfg.seed == 42 and 2 <= cfg.epochs <= 5 and 5e-6 <= cfg.lr <= 1e-4
 
 
+def test_shipped_ensemble_config_loads():
+    # The ensemble that notebook 09 promoted (P5 Task 6). The offline submission loads it
+    # by NAME, then the blend and the encoder it names: a typo in any of them would only
+    # surface during the 9-hour scoring run.
+    cfg = load_config("ensemble", model_cls=EnsembleConfig)
+    assert cfg.name == "ensemble"
+    assert load_config(cfg.blend, model_cls=BlendConfig).name == cfg.blend
+    assert load_config(cfg.encoder, model_cls=EncoderConfig).name == cfg.encoder
+
+
 def test_shipped_lm_blend_config_loads_with_its_text_config():
     # The offline submission loads both by NAME from the installed wheel, so a typo in
     # either file would only surface during the 9-hour scoring run.

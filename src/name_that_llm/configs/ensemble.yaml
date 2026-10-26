@@ -1,0 +1,14 @@
+# The P5 ensemble: TF-IDF `lr`, the Qwen 3 4B LM head and the tuned encoder (P5 Task 6).
+# Promoted by notebooks/09-encoder-final (run v1 of 2026-10-26):
+#   - The weights were chosen on the seed-7 folds, by an exact search in steps of 0.05.
+#   - On fresh folds (seeds 42, 43, 44): mean CV 0.4231, against 0.4023 for lm_blend.
+#   - The A/B gate (seed 42): +0.0167, 95% CI [+0.0041, +0.0300], so the lower bound is > 0.
+# `blend` names the config that supplies the text model and the LM head (features, layers,
+# C). Its own LM weight is ignored here: `weights` sets all three shares at once.
+name: ensemble
+blend: lm_blend
+encoder: encoder
+weights:  # text, LM head, encoder
+- 0.7
+- 0.15
+- 0.15
