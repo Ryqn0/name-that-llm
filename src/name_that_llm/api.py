@@ -44,18 +44,10 @@ from starlette.concurrency import run_in_threadpool
 from name_that_llm import __version__
 from name_that_llm.champion import describe_confidence
 from name_that_llm.data import LAB_OF, LABELS, flatten_text
+from name_that_llm.labels import LAB_NAMES  # re-exported: tests import it from here
 
 log = logging.getLogger("name_that_llm.api")
 
-# How the page names each lab (labels.LAB_OF uses short lowercase keys).
-LAB_NAMES = {
-    "anthropic": "Anthropic",
-    "google": "Google",
-    "zai": "Z.ai",
-    "openai": "OpenAI",
-    "moonshot": "Moonshot",
-    "qwen": "Qwen",
-}
 MIN_WORDS, MAX_WORDS = 20, 1000  # counted after flattening, both ends allowed
 
 

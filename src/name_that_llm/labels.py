@@ -47,3 +47,14 @@ LAB_OF: dict[str, str] = {
     model: next(lab for prefix, lab in _LAB_BY_PREFIX.items() if model.startswith(prefix))
     for model in LABELS
 }
+
+# How pages name each lab (LAB_OF uses short lowercase keys). Shared by the web app (api.py)
+# and the browser demo's export (browser.py), so both pages say the same thing.
+LAB_NAMES: dict[str, str] = {
+    "anthropic": "Anthropic",
+    "google": "Google",
+    "zai": "Z.ai",
+    "openai": "OpenAI",
+    "moonshot": "Moonshot",
+    "qwen": "Qwen",
+}

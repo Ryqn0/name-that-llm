@@ -1,0 +1,5 @@
+{
+  "//": "Tells Node that ntl.js is an ES module, as browsers read it (tests and deploy smoke test).",
+  "type": "module",
+  "private": true
+}

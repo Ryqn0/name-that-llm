@@ -180,14 +180,29 @@ CV = the seed-42 folds, the same for every row.
 
 ## Next steps
 
-State on 2026-10-26: P5 is done. All 7 of its tasks are merged, and the ensemble is
-champion at public LB 0.410.
+State on 2026-10-26 (late): **P4 in progress** ([design](docs/superpowers/specs/2026-10-26-p4-app-design.md),
+[plan](docs/superpowers/plans/2026-10-26-p4-app.md); ledger in
+`.superpowers/sdd/2026-10-26-p4-app/progress.md`). P5 is done (champion LB 0.410).
 
-1. **P4, App v1 and CD:** real-time inference, Docker, CD, a model card, and a live demo
-   serving the champion.
-   - A question for P4's design: the champion needs Qwen 3 4B (a GPU) and 5 encoder
-     models (1.5 GB). That's too heavy for a free CPU host, so the demo may serve a
-     lighter variant.
+1. **P4, where it stands:**
+   - **Done and merged** (Tasks 1–6, PRs #31–#36): `flatten_text`, the 10-block Qwen
+     loader, the `Champion` predictor with its "How sure?" bands, the MLflow packaging and
+     registration script, the FastAPI app and its page, and the Docker image (built in CI).
+   - **Task 7 done:** `name-that-llm` v1 is `@champion` in the private DagsHub registry
+     `Ryqn0/name-that-llm`. The token lives in `C:\Users\dungr\.dagshub.env`, outside the
+     repo. Every check passed: the Hub's Qwen matches the Kaggle features, and parity is 50
+     of 50.
+   - **Task 8 (CD) merged, then blocked:** Hugging Face now charges for Docker Spaces (PRO).
+     The user chose the **lighter free demo** (design §12): a static Space running only
+     `lr`, in the browser.
+   - **Task 8a in progress** (branch `p4-08a-engine`, pushed, not merged): the JavaScript
+     engine `app/demo/ntl.js`, which passes its parity tests (16 passed), and the export
+     `name_that_llm.browser`. Next, ship 8a (a PR with a CI-gated merge), then 8b (export
+     `lr` with its own bands, as a pinned MLflow run), then 8c (the static page and its
+     deploy; GitHub variable `HF_SPACE` = `Ryqn/name-that-llm`), then Task 9 (the docs and
+     the journal).
+   - **Note:** run the registration script with `python -I -X utf8`. MLflow prints an emoji,
+     which Windows' cp1252 can't write.
 2. **Fix W&B in the GPU notebooks:** every pushed P5 run printed "W&B tracking is OFF
    (ConnectionError)", so P5 has no W&B runs. Most likely the Kaggle Secret
    `WANDB_API_KEY` must be attached to each notebook once, in the Kaggle editor
