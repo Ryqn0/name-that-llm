@@ -48,6 +48,13 @@ outputs are a public repo, a progress diary, and a live demo app.
   - **Task 5 (2026-10-26):** the rematch confirmed ModernBERT: DeBERTa at its settings
     scored 0.171. Tuning on two folds chose lr 4.4e-5 and **5 epochs** (0.374 against the
     default's 0.344), saved as `configs/encoder.yaml`.
+  - **Task 6 (2026-10-26):** the three-model ensemble (`lr`, the LM head and the encoder,
+    weights 0.70 / 0.15 / 0.15) passes the A/B gate. Its mean CV on fresh folds is
+    **0.423**, against `lm_blend`'s 0.402; on seed 42: +0.017, 95% CI [+0.004, +0.030].
+    Saved as `configs/ensemble.yaml`. It becomes champion only if the public LB beats 0.389
+    (Task 7).
+    - The encoder alone scores 0.353. Fine-tuning is noisy: the same config, folds and
+      seed differed by 0.014 between two runs.
   - Before that, P3 was completed: P3a (prompt assignment) and P3b (LM features, then
     tuning, [plan](docs/superpowers/plans/2026-10-24-p3b-lm-features.md)).
 - **Lessons so far:**
@@ -72,6 +79,8 @@ CV = the seed-42 folds, the same for every row.
 
 | date | model | CV | LB | W&B run |
 |---|---|---|---|---|
+| 2026-10-26 | ensemble (lr + LM head + ModernBERT, 0.70 / 0.15 / 0.15) | 0.4219 | — | — |
+| 2026-10-26 | encoder (ModernBERT-base, tuned) | 0.3501 | — | — |
 | 2026-10-25 | **lm_blend** (lr + Qwen 3 4B layers 6–9) | 0.4052 | **0.389** | — |
 | 2026-10-25 | lm_blend_tuned (Optuna's best, not promoted) | 0.3963 | — | — |
 | 2026-10-24 | lr | 0.3212 | **0.320** | r0lx5cja |
@@ -168,16 +177,18 @@ CV = the seed-42 folds, the same for every row.
 
 ## Next steps
 
-State on 2026-10-26: P5 Tasks 1–5 are done: the library (PRs #22–#24), 07-encoder-select
-(ModernBERT-base wins) and 08-encoder-tune (`configs/encoder.yaml`). Progress lives in the
-ledger, `.superpowers/sdd/2026-10-25-p5-encoders/progress.md`, and the notebook builders
-are in its `scripts/` folder.
+State on 2026-10-26: P5 Tasks 1–6 are done: the library (PRs #22–#24), 07-encoder-select
+(ModernBERT-base wins), 08-encoder-tune (`configs/encoder.yaml`) and 09-encoder-final (the
+ensemble passes the A/B gate: `configs/ensemble.yaml`). Progress lives in the ledger,
+`.superpowers/sdd/2026-10-25-p5-encoders/progress.md`, and the notebook builders are in its
+`scripts/` folder. P5 has used about 3.7 of its 8 GPU-hours.
 
-1. **Task 6**, the final GPU notebook (09): 4 fold seeds, the ensemble with `lm_blend`,
-   and the A/B gate.
-   - Push only after the user's OK in the current session: approvals don't carry over
-     between sessions.
-   - The submission (Task 7) always needs its own OK.
+1. **Task 7**, the offline submission of the ensemble:
+   - Add the encoder (09's seed-42 fold models) to the 90-submit notebook, smoke-test it,
+     then release v0.7.0.
+   - Pushing it and submitting it each need the user's OK in the current session:
+     approvals don't carry over between sessions.
+   - It replaces `lm_blend` only if the public LB beats 0.389.
 2. **Then P4, App v1 and CD:** real-time inference, Docker, CD, a model card, and a live
    demo serving the champion.
 3. Cheap follow-ups: I-015 (calibrated or log blend, in P7's M6 ensemble), I-017 (TF
