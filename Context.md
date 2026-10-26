@@ -39,6 +39,12 @@ outputs are a public repo, a progress diary, and a live demo app.
 - Phase: **P5 in progress**: fine-tuned encoders, DeBERTa-v3-base vs ModernBERT-base
   ([plan](docs/superpowers/plans/2026-10-25-p5-encoders.md)). The user chose the order
   P5, then P4, on 2026-10-25.
+  - **Task 4 (2026-10-26):** ModernBERT-base wins the encoder head-to-head, at seed-7 CV
+    **0.344** against DeBERTa-v3-base's 0.206 and TF-IDF `lr`'s 0.330. P5's exit
+    criterion is met.
+    - DeBERTa underfit at its default lr, so notebook 08 re-checks it at ModernBERT's
+      settings before tuning.
+    - Kaggle's T4 accelerator provides **2 GPUs**; we use one so far (I-019).
   - Before that, P3 was completed: P3a (prompt assignment) and P3b (LM features, then
     tuning, [plan](docs/superpowers/plans/2026-10-24-p3b-lm-features.md)).
 - **Lessons so far:**
@@ -159,20 +165,18 @@ CV = the seed-42 folds, the same for every row.
 
 ## Next steps
 
-State on 2026-10-26: P5 Tasks 1–3 are merged (PRs #22–#24), so the whole library is on
-`main`. The first GPU notebook, `ryqn00/name-that-llm-encoder-select` (v1, DeBERTa-v3 vs
-ModernBERT), was pushed with the user's OK and is running. Progress lives in the ledger,
-`.superpowers/sdd/2026-10-25-p5-encoders/progress.md`.
+State on 2026-10-26: P5 Tasks 1–4 are done. The library is on `main` (PRs #22–#24), and
+07-encoder-select ran: ModernBERT-base wins. Progress lives in the ledger,
+`.superpowers/sdd/2026-10-25-p5-encoders/progress.md`, and the notebook builders are in its
+`scripts/` folder.
 
-1. **Collect 07's results** (P5 Task 4):
-   - Download its outputs and record the winner, plus both CVs against `lr`'s 0.3304 on
-     the seed-7 folds.
-   - Fill in the Findings cell, then ship branch `p5-04-select`.
-2. **Tasks 5 and 6**, the tuning and final GPU notebooks:
-   - The user pre-approved pushing them on 2026-10-26. Approval doesn't carry over between
-     sessions, so confirm once before pushing.
+1. **Tasks 5 and 6**, the tuning (08) and final (09) GPU notebooks:
+   - 08 first re-runs DeBERTa at ModernBERT's settings, then tunes whichever scores
+     higher.
+   - Push only after the user's OK in the current session: approvals don't carry over
+     between sessions.
    - The submission (Task 7) always needs its own OK.
-3. **Then P4, App v1 and CD:** real-time inference, Docker, CD, a model card, and a live
+2. **Then P4, App v1 and CD:** real-time inference, Docker, CD, a model card, and a live
    demo serving the champion.
 3. Cheap follow-ups: I-015 (calibrated or log blend, in P7's M6 ensemble), I-017 (TF
    without IDF), I-018 (the weight grid inside each Optuna trial).
