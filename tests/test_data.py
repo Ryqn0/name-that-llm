@@ -2,7 +2,15 @@ import pandas as pd
 import pytest
 from pandera.errors import SchemaError
 
-from name_that_llm.data import LAB_OF, LABELS, find_data_dir, load_test, load_train, normalize_text
+from name_that_llm.data import (
+    LAB_OF,
+    LABELS,
+    find_data_dir,
+    flatten_text,
+    load_test,
+    load_train,
+    normalize_text,
+)
 
 EXPECTED = {
     "claude-fable-5",
@@ -42,6 +50,35 @@ def test_normalize_text_keeps_style_marks():
 
 def test_normalize_text_composes_accents():
     assert normalize_text("café") == "café"
+
+
+# A chatbot answer as a visitor would paste it: every kind of markdown the app must undo.
+MARKDOWN = (
+    "# Title\n\nSome **bold** and *italic* text.\n\n- first point\n- second point\n\n"
+    "1. step one\n2) step two\n\n> a quote\n\n```python\nx = 1\n```\n\n"
+    "A [link](https://example.com) and `code`.\n\n| a | b |\n|---|---|\n| 1 | 2 |"
+)
+
+
+def test_flatten_text_turns_markdown_into_one_paragraph():
+    # Hand-derived: the markup goes, the words stay, single *emphasis* survives (the host
+    # kept it in 14 training passages), and everything joins into one paragraph.
+    assert flatten_text(MARKDOWN) == (
+        "Title Some bold and *italic* text. first point second point step one step two "
+        "a quote x = 1 A link and code. a b 1 2"
+    )
+
+
+def test_flatten_text_leaves_training_style_text_alone():
+    # One paragraph, single *emphasis*, a number ending a sentence, an em dash, an inline
+    # "1." : all of these occur in the real training passages and must survive unchanged.
+    text = "It costs $5. Then *this* matters — as it did in 2023. Done (see 1. above)."
+    assert flatten_text(text) == text
+
+
+def test_flatten_text_collapses_whitespace_and_normalizes():
+    assert flatten_text("  a\n\nb\t c   d  ") == "a b c d"
+    assert flatten_text("caf" + "é") == "café"  # NFC, as normalize_text does
 
 
 def test_load_train_keeps_ids_as_strings(fake_data_dir):

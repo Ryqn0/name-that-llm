@@ -5,6 +5,7 @@ so every notebook, test and (later) the app sees the data exactly the same way.
 """
 
 import os
+import re
 import unicodedata
 from collections.abc import Sequence
 from pathlib import Path
@@ -16,7 +17,15 @@ from name_that_llm.schemas import TestSchema, TrainSchema
 
 # LABELS and LAB_OF live in labels.py (to avoid a circular import with schemas.py)
 # but are part of this module's public interface.
-__all__ = ["LABELS", "LAB_OF", "find_data_dir", "load_test", "load_train", "normalize_text"]
+__all__ = [
+    "LABELS",
+    "LAB_OF",
+    "find_data_dir",
+    "flatten_text",
+    "load_test",
+    "load_train",
+    "normalize_text",
+]
 
 # src/name_that_llm/data.py -> parents[2] is the repo root (only meaningful in a
 # local checkout; on Kaggle the package is installed elsewhere and this path won't exist).
@@ -44,6 +53,50 @@ def normalize_text(text: str) -> str:
     becomes a normal space. Those are real style fingerprints, so NFKC would erase them.
     """
     return unicodedata.normalize("NFC", text).strip()
+
+
+# Markdown that only makes sense at the START of a line (after its indentation).
+_FENCE = re.compile(r"^(```|~~~)")  # a code fence line: dropped, the code itself is kept
+_TABLE_RULE = re.compile(r"^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?$")  # |---|---|
+_QUOTE = re.compile(r"^(>\s?)+")  # "> quote", also nested ">> quote"
+_LIST_OR_HEADING = re.compile(r"^(#{1,6}|[-*+]|\d+[.)])\s+")  # "# h", "- b", "* b", "1. n"
+# Markdown that can appear ANYWHERE in a line.
+_IMAGE = re.compile(r"!\[([^\]]*)\]\([^)]*\)")  # ![alt](url) -> alt
+_LINK = re.compile(r"\[([^\]]+)\]\([^)]*\)")  # [text](url) -> text
+
+
+def flatten_text(text: str) -> str:
+    """Turn pasted chatbot markdown into ONE plain paragraph, like the training passages.
+
+    Why: the competition's host flattened every passage before we got it. None of the
+    2,699 has a line break, a heading, `**bold**`, a backtick or a list marker. A visitor
+    pastes raw chatbot output, full of exactly those. Feeding that to models that never
+    saw it would be a train/serve skew: the input's FORMAT would differ from training,
+    not just its content. So the app flattens first, the way the host did.
+
+    What the training data tells us about the host's rules (P4 design §6):
+      - line breaks, headings, bold, backticks, bullets and list numbers are gone;
+      - single `*emphasis*` SURVIVES (14 training passages still contain it), so we keep
+        single asterisks and underscores and remove only the doubled ones;
+      - a number ending a sentence ("in 2023. The") is ordinary text, so list numbers
+        are removed only at the start of a line.
+    Contract: training-style text (one paragraph, no markdown) comes back unchanged.
+    The local check in P4 Task 1 confirms it on all 2,699 real passages.
+    """
+    lines = []
+    for line in text.splitlines():
+        line = line.strip()
+        if _FENCE.match(line) or _TABLE_RULE.match(line):
+            continue  # pure syntax: nothing to keep
+        line = _QUOTE.sub("", line)  # a quote can hold a list item: strip it first
+        line = _LIST_OR_HEADING.sub("", line)
+        lines.append(line)
+    flat = " ".join(lines)
+    flat = _LINK.sub(r"\1", _IMAGE.sub(r"\1", flat))
+    # Bold and inline code markers go; table cell borders become word gaps.
+    flat = flat.replace("**", "").replace("__", "").replace("`", "").replace("|", " ")
+    # Every run of whitespace (newlines, tabs, double spaces) becomes a single space.
+    return normalize_text(re.sub(r"\s+", " ", flat))
 
 
 def find_data_dir(candidates: Sequence[Path] | None = None) -> Path:

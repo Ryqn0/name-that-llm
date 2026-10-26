@@ -1,0 +1,74 @@
+<!doctype html>
+<!-- The P4 app page as approved during brainstorming (layout B, with the warning box).
+     A static mockup with a made-up result: structure and wording, not final styling. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P4 app mockup</title>
+<style>
+  :root {
+    --accent: #0071e3; --bg: #f5f5f7; --card: #ffffff; --track: #e5e5e7;
+    --text: #1d1d1f; --muted: #86868b; --border: #d1d1d6; --warning: #ff9f0a;
+  }
+  body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text);
+         font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .page { max-width: 640px; margin: 0 auto; background: var(--card); border: 1px solid var(--border);
+          border-radius: 10px; padding: 20px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .muted { color: var(--muted); }
+  .paste { height: 72px; border: 1px dashed var(--border); border-radius: 6px; display: flex;
+           align-items: center; justify-content: center; color: var(--muted); margin-top: 10px; }
+  button { margin-top: 8px; padding: 8px 16px; border: 0; border-radius: 6px; background: var(--accent);
+           color: #fff; font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
+  .best { font-size: 22px; font-weight: 700; margin: 2px 0 4px; }
+  .best span { font-size: 14px; font-weight: 400; color: var(--muted); }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 10px; background: var(--track); }
+  .bars { display: grid; grid-template-columns: 110px 64px 1fr 36px; gap: 4px 8px; align-items: center;
+          margin-top: 10px; }
+  .track { background: var(--track); border-radius: 3px; height: 9px; }
+  .fill { background: var(--accent); border-radius: 3px; height: 9px; }
+  .right { text-align: right; }
+  .link { color: var(--accent); margin-top: 8px; }
+  .warning { border-left: 4px solid var(--warning); background: var(--track); padding: 10px 12px;
+             margin-top: 16px; border-radius: 4px; }
+  .warning ul { margin: 4px 0 0; padding-left: 18px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Which LLM wrote this?</h1>
+  <div class="muted">Paste a passage written by an AI chatbot. The app guesses which of 18 models wrote it.</div>
+  <div class="paste">Paste a passage (20 to 1,000 words; it works best on 50 to 300)…</div>
+  <button>Identify</button>
+  <div class="muted" style="margin-top:6px">While it works: "Reading the passage… about 5 seconds"</div>
+
+  <hr>
+
+  <div class="muted">Most likely</div>
+  <div class="best">gpt-5.6-luna <span>by OpenAI · 38%</span></div>
+  <span class="pill">How sure? <b>Unsure</b>: the best guess has only 38%.</span>
+
+  <div class="bars">
+    <span>gpt-5.6-luna</span><span class="muted">OpenAI</span><div class="track"><div class="fill" style="width:38%"></div></div><span class="right">38%</span>
+    <span>gpt-5.6-sol</span><span class="muted">OpenAI</span><div class="track"><div class="fill" style="width:21%"></div></div><span class="right">21%</span>
+    <span>gpt-5.6-terra</span><span class="muted">OpenAI</span><div class="track"><div class="fill" style="width:12%"></div></div><span class="right">12%</span>
+    <span>gpt-6-astra</span><span class="muted">OpenAI</span><div class="track"><div class="fill" style="width:7%"></div></div><span class="right">7%</span>
+    <span>gpt-5.5</span><span class="muted">OpenAI</span><div class="track"><div class="fill" style="width:5%"></div></div><span class="right">5%</span>
+  </div>
+  <div class="link">Show all 18 ▾</div>
+
+  <div class="warning">
+    <b>⚠ Before you trust this</b>
+    <ul>
+      <li><b>It is not an AI detector.</b> It only knows these 18 models and always picks one of them, even for text written by a human or by another AI.</li>
+      <li>It learned from 2,699 passages from a Kaggle competition (about 150 per model), so other topics or writing styles can fool it.</li>
+      <li>On new passages, it names the exact model right about 4 times in 10.</li>
+      <li>Your text is not stored.</li>
+    </ul>
+    <div class="link">How it works, and its limits (model card) →</div>
+  </div>
+</div>
+</body>
+</html>
