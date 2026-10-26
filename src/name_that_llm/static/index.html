@@ -1,0 +1,163 @@
+<!doctype html>
+<!-- The app's only page (P4 design §3, layout B). Plain HTML + JavaScript, served by
+     FastAPI at "/": it posts the pasted text to /predict and draws the answer. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which LLM wrote this?</title>
+<style>
+  :root {
+    --accent: #0071e3; --bg: #f5f5f7; --card: #ffffff; --track: #e5e5e7;
+    --text: #1d1d1f; --muted: #6e6e73; --border: #d1d1d6; --warning: #ff9f0a; --error: #d70015;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --accent: #2997ff; --bg: #1d1d1f; --card: #2c2c2e; --track: #3a3a3c;
+      --text: #f5f5f7; --muted: #a1a1a6; --border: #48484a; --error: #ff6961;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 680px; margin: 0 auto; background: var(--card); border: 1px solid var(--border);
+         border-radius: 12px; padding: 20px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .muted { color: var(--muted); }
+  textarea { width: 100%; min-height: 140px; margin-top: 12px; padding: 10px; border-radius: 8px;
+             border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; resize: vertical; }
+  .row { display: flex; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+  button { padding: 9px 18px; border: 0; border-radius: 8px; background: var(--accent); color: #fff;
+           font: inherit; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: 0.6; cursor: default; }
+  button.link { background: none; color: var(--accent); padding: 0; font-weight: 400; }
+  #status { min-height: 1.5em; }
+  #status.error { color: var(--error); }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
+  .best { font-size: 26px; font-weight: 700; margin: 2px 0 6px; word-break: break-word; }
+  .best span { font-size: 15px; font-weight: 400; color: var(--muted); }
+  .pill { display: inline-block; padding: 3px 12px; border-radius: 12px; background: var(--track); }
+  .bars { display: grid; grid-template-columns: minmax(110px, auto) 82px 1fr 44px; gap: 6px 10px;
+          align-items: center; margin-top: 12px; }
+  .track { background: var(--track); border-radius: 4px; height: 10px; }
+  .fill { background: var(--accent); border-radius: 4px; height: 10px; }
+  .right { text-align: right; font-variant-numeric: tabular-nums; }
+  .warning { border-left: 4px solid var(--warning); background: var(--track); padding: 10px 14px;
+             margin-top: 18px; border-radius: 6px; }
+  .warning ul { margin: 6px 0 0; padding-left: 20px; }
+  a { color: var(--accent); }
+  footer { margin-top: 14px; font-size: 13px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Which LLM wrote this?</h1>
+  <div class="muted">Paste a passage written by an AI chatbot. The app guesses which of 18 models wrote it.</div>
+
+  <label for="text" class="muted" style="display:block;margin-top:12px">
+    The passage: 20 to 1,000 words (it works best on 50 to 300)
+  </label>
+  <textarea id="text" placeholder="Paste the passage here (Ctrl+V)…"></textarea>
+  <div class="row">
+    <button id="identify">Identify</button>
+    <span id="status" role="status" aria-live="polite"></span>
+  </div>
+
+  <section id="result" hidden>
+    <hr>
+    <div class="muted">Most likely</div>
+    <div class="best" id="best"></div>
+    <span class="pill" id="sure"></span>
+    <div class="bars" id="top"></div>
+    <div class="bars" id="rest" hidden></div>
+    <div class="row"><button class="link" id="toggle">Show all 18 ▾</button></div>
+  </section>
+
+  <div class="warning">
+    <b>⚠ Before you trust this</b>
+    <ul>
+      <li><b>It is not an AI detector.</b> It only knows these 18 models and always picks one of them,
+        even for text written by a human or by another AI.</li>
+      <li>It learned from 2,699 passages from a Kaggle competition (about 150 per model), so other
+        topics or writing styles can fool it.</li>
+      <li>On new passages, it names the exact model right about 4 times in 10.</li>
+      <li>Your text is not stored.</li>
+    </ul>
+    <div style="margin-top:6px"><a id="card" href="https://github.com/Ryqn0/name-that-llm">How it works, and its limits (model card) →</a></div>
+  </div>
+  <footer class="muted" id="footer"></footer>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const MESSAGES = {  // what each refusal means, in plain words
+    413: "That text is too long: paste at most about 1,000 words.",
+    429: "Too many requests: wait a minute, then try again.",
+  };
+
+  // One bar row: model, company, bar, percentage (built with DOM calls, never innerHTML,
+  // so nothing the server returns can inject markup).
+  function addRow(grid, entry) {
+    const pct = (100 * entry.probability).toFixed(0) + "%";
+    const name = document.createElement("span"); name.textContent = entry.model;
+    const lab = document.createElement("span"); lab.className = "muted"; lab.textContent = entry.lab;
+    const track = document.createElement("div"); track.className = "track";
+    const fill = document.createElement("div"); fill.className = "fill";
+    fill.style.width = (100 * entry.probability).toFixed(1) + "%";
+    track.appendChild(fill);
+    const value = document.createElement("span"); value.className = "right"; value.textContent = pct;
+    grid.append(name, lab, track, value);
+  }
+
+  function show(body) {
+    const [best, ...others] = body.ranking;
+    $("best").textContent = best.model + " ";
+    const by = document.createElement("span");
+    by.textContent = "by " + best.lab + " · " + (100 * best.probability).toFixed(0) + "%";
+    $("best").appendChild(by);
+    $("sure").textContent = "How sure? " + body.confidence.label + ": at this level, the best guess is right about "
+      + body.confidence.right_in_10 + " times in 10.";
+    $("top").replaceChildren(); $("rest").replaceChildren();
+    body.ranking.slice(0, 5).forEach((e) => addRow($("top"), e));
+    body.ranking.slice(5).forEach((e) => addRow($("rest"), e));
+    $("rest").hidden = true; $("toggle").textContent = "Show all 18 ▾";
+    $("result").hidden = false;
+  }
+
+  async function identify() {
+    const text = $("text").value;
+    $("identify").disabled = true;
+    $("status").className = ""; $("status").textContent = "Reading the passage… about 5 seconds";
+    try {
+      const response = await fetch("predict", {
+        method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({text}),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(MESSAGES[response.status] || body.detail || "Something went wrong.");
+      show(body);
+      $("status").textContent = "Done in " + body.seconds + " s.";
+    } catch (error) {
+      $("status").className = "error";
+      $("status").textContent = error instanceof TypeError ? "Can't reach the app right now." : error.message;
+    } finally {
+      $("identify").disabled = false;
+    }
+  }
+
+  $("identify").addEventListener("click", identify);
+  $("toggle").addEventListener("click", () => {
+    $("rest").hidden = !$("rest").hidden;
+    $("toggle").textContent = $("rest").hidden ? "Show all 18 ▾" : "Show the top 5 ▴";
+  });
+
+  // The footer says exactly which model answers, and links the model card on the Space.
+  fetch("version").then((r) => r.json()).then((v) => {
+    const model = v.model_version ? "model v" + v.model_version + " (" + v.encoder_folds + " encoder folds)"
+                                  : "model loading…";
+    $("footer").textContent = "name-that-llm " + v.package + " · " + model + " · commit " + String(v.commit).slice(0, 7);
+    if (v.space_id) $("card").href = "https://huggingface.co/spaces/" + v.space_id + "/blob/main/README.md";
+  }).catch(() => {});
+</script>
+</body>
+</html>
