@@ -36,25 +36,16 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 ## Status
 
-- Phase: **P5 in progress**: fine-tuned encoders, DeBERTa-v3-base vs ModernBERT-base
-  ([plan](docs/superpowers/plans/2026-10-25-p5-encoders.md)). The user chose the order
-  P5, then P4, on 2026-10-25.
-  - **Task 4 (2026-10-26):** ModernBERT-base wins the encoder head-to-head, at seed-7 CV
-    **0.344** against DeBERTa-v3-base's 0.206 and TF-IDF `lr`'s 0.330. P5's exit
-    criterion is met.
-    - DeBERTa underfit at its default lr, so notebook 08 re-checks it at ModernBERT's
-      settings before tuning.
-    - Kaggle's T4 accelerator provides **2 GPUs**; we use one so far (I-019).
-  - **Task 5 (2026-10-26):** the rematch confirmed ModernBERT: DeBERTa at its settings
-    scored 0.171. Tuning on two folds chose lr 4.4e-5 and **5 epochs** (0.374 against the
-    default's 0.344), saved as `configs/encoder.yaml`.
-  - **Task 6 (2026-10-26):** the three-model ensemble (`lr`, the LM head and the encoder,
-    weights 0.70 / 0.15 / 0.15) passes the A/B gate. Its mean CV on fresh folds is
-    **0.423**, against `lm_blend`'s 0.402; on seed 42: +0.017, 95% CI [+0.004, +0.030].
-    Saved as `configs/ensemble.yaml`. It becomes champion only if the public LB beats 0.389
-    (Task 7).
-    - The encoder alone scores 0.353. Fine-tuning is noisy: the same config, folds and
-      seed differed by 0.014 between two runs.
+- Phase: **P5 done** (2026-10-26): fine-tuned encoders
+  ([plan](docs/superpowers/plans/2026-10-25-p5-encoders.md)). **Next: P4**, App v1 and CD
+  (the user chose P5, then P4, on 2026-10-25).
+  - ModernBERT-base beat DeBERTa-v3-base: seed-7 CV 0.344 against 0.206, and DeBERTa scored
+    0.171 even at ModernBERT's settings. Tuning chose lr 4.4e-5 and 5 epochs
+    (`configs/encoder.yaml`).
+  - The three-model ensemble passed the A/B gate on fresh folds, then scored **public LB
+    0.410** (+0.021 over `lm_blend`'s 0.389): the new champion (`configs/ensemble.yaml`).
+  - P5 used about 4.1 of its 8 GPU-hours. Kaggle's T4 accelerator provides **2 GPUs**; we
+    use one so far (I-019).
   - Before that, P3 was completed: P3a (prompt assignment) and P3b (LM features, then
     tuning, [plan](docs/superpowers/plans/2026-10-24-p3b-lm-features.md)).
 - **Lessons so far:**
@@ -66,22 +57,30 @@ outputs are a public repo, a progress diary, and a live demo app.
   - P3b: Qwen 3 hidden states work. Blended with `lr`, they reach a CV of 0.402 (the mean
     of three fresh seeds) and **public LB 0.389** (+0.069). The CV–LB gap widened from
     −0.001 to −0.013, so watch it. Optuna didn't beat the hand-made sweep (I-012, I-018).
-- **Leaderboard snapshot, 2026-10-25:** 3,231 teams; median 0.526; top-10% cutoff 0.639;
-  best 0.703. We're about 2,219th (from about 2,687th on 2026-10-24).
-- Champion: **`lm_blend`** (since 2026-10-25): `lr`, the word + character TF-IDF logistic
-  regression, blended with a logistic regression on Qwen 3 4B base layers 6–9 at LM weight
-  0.1.
-  - It beat `lr` on fresh folds (+0.084, 95% CI [+0.066, +0.101]) and on the public LB
-    (0.389 vs 0.320).
-  - The offline submission runs it on a T4 GPU in about 20 minutes.
+  - P5: a fine-tuned ModernBERT-base is weaker alone (0.353) but makes different mistakes,
+    so a 15% share lifts the blend: +0.021 on fresh folds, and +0.021 on the public LB. The
+    CV–LB gap held at −0.013. Fine-tuning is noisy (identical runs differed by 0.014 on two
+    folds), so a small tuning gain needs a second seed (I-022).
+- **Leaderboard snapshot, 2026-10-26:** 3,387 teams; median 0.532; top-10% cutoff 0.641;
+  best 0.710. With 0.410 we're about 2,236th (about 2,219th on 2026-10-25, with 0.389).
+- Champion: **`ensemble`** (since 2026-10-26), a weighted mean of three models'
+  probabilities, 0.70 / 0.15 / 0.15:
+  1. `lr`, the word + character TF-IDF logistic regression;
+  2. the LM head, a logistic regression on Qwen 3 4B base layers 6–9 (together with `lr`,
+     the previous champion `lm_blend`);
+  3. ModernBERT-base fine-tuned on our 18 labels: the average of its 5 fold models.
+
+  It beat `lm_blend` on fresh folds (+0.017 on seed 42, 95% CI [+0.004, +0.030]) and on the
+  public LB (0.410 vs 0.389). The offline submission runs it on a T4 GPU in about 30
+  minutes.
 
 CV = the seed-42 folds, the same for every row.
 
 | date | model | CV | LB | W&B run |
 |---|---|---|---|---|
-| 2026-10-26 | ensemble (lr + LM head + ModernBERT, 0.70 / 0.15 / 0.15) | 0.4219 | — | — |
+| 2026-10-26 | **ensemble** (lr + LM head + ModernBERT, 0.70 / 0.15 / 0.15) | 0.4219 | **0.410** | — |
 | 2026-10-26 | encoder (ModernBERT-base, tuned) | 0.3501 | — | — |
-| 2026-10-25 | **lm_blend** (lr + Qwen 3 4B layers 6–9) | 0.4052 | **0.389** | — |
+| 2026-10-25 | lm_blend (lr + Qwen 3 4B layers 6–9) | 0.4052 | **0.389** | — |
 | 2026-10-25 | lm_blend_tuned (Optuna's best, not promoted) | 0.3963 | — | — |
 | 2026-10-24 | lr | 0.3212 | **0.320** | r0lx5cja |
 | 2026-10-24 | lr + assign (topic groups) | 0.4056 | 0.320 | to8unxny |
@@ -177,19 +176,18 @@ CV = the seed-42 folds, the same for every row.
 
 ## Next steps
 
-State on 2026-10-26: P5 Tasks 1–6 are done: the library (PRs #22–#24), 07-encoder-select
-(ModernBERT-base wins), 08-encoder-tune (`configs/encoder.yaml`) and 09-encoder-final (the
-ensemble passes the A/B gate: `configs/ensemble.yaml`). Progress lives in the ledger,
-`.superpowers/sdd/2026-10-25-p5-encoders/progress.md`, and the notebook builders are in its
-`scripts/` folder. P5 has used about 3.7 of its 8 GPU-hours.
+State on 2026-10-26: P5 is done. All 7 of its tasks are merged, and the ensemble is
+champion at public LB 0.410.
 
-1. **Task 7**, the offline submission of the ensemble:
-   - Add the encoder (09's seed-42 fold models) to the 90-submit notebook, smoke-test it,
-     then release v0.7.0.
-   - Pushing it and submitting it each need the user's OK in the current session:
-     approvals don't carry over between sessions.
-   - It replaces `lm_blend` only if the public LB beats 0.389.
-2. **Then P4, App v1 and CD:** real-time inference, Docker, CD, a model card, and a live
-   demo serving the champion.
+1. **P4, App v1 and CD:** real-time inference, Docker, CD, a model card, and a live demo
+   serving the champion.
+   - A question for P4's design: the champion needs Qwen 3 4B (a GPU) and 5 encoder
+     models (1.5 GB). That's too heavy for a free CPU host, so the demo may serve a
+     lighter variant.
+2. **Fix W&B in the GPU notebooks:** every pushed P5 run printed "W&B tracking is OFF
+   (ConnectionError)", so P5 has no W&B runs. Most likely the Kaggle Secret
+   `WANDB_API_KEY` must be attached to each notebook once, in the Kaggle editor
+   (Add-ons → Secrets).
 3. Cheap follow-ups: I-015 (calibrated or log blend, in P7's M6 ensemble), I-017 (TF
-   without IDF), I-018 (the weight grid inside each Optuna trial).
+   without IDF), I-018 (the weight grid inside each Optuna trial), I-020 and I-022 (encoder
+   tuning: more epochs, and the noise floor).
