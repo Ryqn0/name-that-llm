@@ -1,7 +1,13 @@
 import numpy as np
 import pytest
 
-from name_that_llm.lm import find_model_dir, pooled_hidden_states, select_layers
+from name_that_llm.lm import (
+    find_model_dir,
+    load_lm,
+    load_lm_layers,
+    pooled_hidden_states,
+    select_layers,
+)
 
 # A 5-word vocabulary is enough to exercise tokenization, padding and pooling.
 VOCAB = ["[PAD]", "[UNK]", "a", "b", "c"]
@@ -109,3 +115,29 @@ def test_select_layers_averages_a_window():
     np.testing.assert_allclose(select_layers(feats, 1, 2), (feats[1] + feats[2]) / 2)
     with pytest.raises(ValueError):
         select_layers(feats, 3, 2)
+
+
+def test_load_lm_layers_matches_the_full_model_on_kept_layers(tiny_qwen, fake_train):
+    # The app loads only Qwen's first 10 blocks: the LM head reads layers 6-9, so the other
+    # 26 blocks would cost memory and time for nothing. Layers 6-9 must be EXACTLY what the
+    # full model gives, or the LM head (trained on full-model features) would be fed
+    # different inputs than it learned from.
+    texts = fake_train["text"].tolist()[:5]
+    full, tokenizer = load_lm(tiny_qwen, device="cpu")
+    cut, cut_tokenizer = load_lm_layers(tiny_qwen, n_layers=10)
+    assert len(cut.layers) == 10
+    a = pooled_hidden_states(texts, full, tokenizer, layers=range(6, 10), batch_size=2)
+    b = pooled_hidden_states(texts, cut, cut_tokenizer, layers=range(6, 10), batch_size=2)
+    np.testing.assert_array_equal(a, b)
+
+
+def test_load_lm_layers_with_nine_blocks_changes_layer_nine(tiny_qwen, fake_train):
+    # The trap: the LAST hidden state goes through the model's final normalization, so a
+    # 9-block cut no longer returns the plain output of block 9. Keep one block more than
+    # the last layer you read.
+    texts = fake_train["text"].tolist()[:5]
+    full, tokenizer = load_lm(tiny_qwen, device="cpu")
+    cut9, _ = load_lm_layers(tiny_qwen, n_layers=9)
+    a = pooled_hidden_states(texts, full, tokenizer, layers=[9], batch_size=2)
+    b = pooled_hidden_states(texts, cut9, tokenizer, layers=[9], batch_size=2)
+    assert np.abs(a - b).max() > 1e-3

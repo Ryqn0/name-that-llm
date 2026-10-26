@@ -59,15 +59,58 @@ def load_lm(model_dir: Path, device: str | None = None, dtype: str = "auto"):
 
     # local_files_only=True: never try to reach the Hugging Face Hub. Offline, a network
     # attempt would only waste time before failing.
-    tokenizer = transformers.AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "right"  # see pooled_hidden_states for why
-
+    tokenizer = _lm_tokenizer(model_dir, local_files_only=True)
     model = transformers.AutoModel.from_pretrained(
         model_dir, local_files_only=True, **_dtype_kwargs(torch_dtype)
     )
     return model.to(device).eval(), tokenizer
+
+
+def load_lm_layers(
+    name_or_dir: str | Path, n_layers: int, revision: str | None = None, device: str = "cpu"
+):
+    """Load a model cut to its first `n_layers` blocks, in float32: (model, tokenizer).
+
+    Why (P4, the app): the LM head reads hidden states 6 to 9 of Qwen 3 4B. The other 26
+    blocks only run AFTER those layers are computed, so a model cut to 10 blocks gives
+    exactly the same features (checked on the real model: difference 0) for a third of the
+    memory (5.2 GB instead of 15 GB) and about a quarter of the time on the Space's CPU.
+
+    The trap: `hidden_states` holds every block's output, except that the LAST entry also
+    goes through the model's final normalization. To read layer 9 unchanged, keep 10 blocks,
+    never 9. The rule: n_layers = the last layer you read + 1.
+
+    `name_or_dir` is a Hub id (e.g. "Qwen/Qwen3-4B-Base", pinned with `revision`) or a local
+    folder; a local folder never triggers a Hub lookup. float32 because the app runs on a
+    CPU, where float16 brings no speed-up and only costs precision.
+    """
+    import torch
+    import transformers
+
+    local = Path(name_or_dir).exists()
+    kwargs = {"revision": revision, "local_files_only": local}
+    config = transformers.AutoConfig.from_pretrained(name_or_dir, **kwargs)
+    config.num_hidden_layers = n_layers
+    # Newer configs list each block's attention type: keep that list as long as the model.
+    if getattr(config, "layer_types", None):
+        config.layer_types = config.layer_types[:n_layers]
+    # The weights of the dropped blocks are in the checkpoint but have nowhere to go, so
+    # they're skipped while loading (transformers reports them as unused keys).
+    model = transformers.AutoModel.from_pretrained(
+        name_or_dir, config=config, **kwargs, **_dtype_kwargs(torch.float32)
+    )
+    return model.to(device).eval(), _lm_tokenizer(name_or_dir, **kwargs)
+
+
+def _lm_tokenizer(source, **kwargs):
+    """The LM's tokenizer, set up for mean pooling: a pad token, and padding on the right."""
+    import transformers
+
+    tokenizer = transformers.AutoTokenizer.from_pretrained(source, **kwargs)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "right"  # see pooled_hidden_states for why
+    return tokenizer
 
 
 def _dtype_kwargs(torch_dtype) -> dict:

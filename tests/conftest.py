@@ -94,6 +94,45 @@ def make_tiny_encoder(texts, path, arch="deberta"):
     return path
 
 
+def make_tiny_qwen(texts, path, n_layers=12):
+    """A tiny RANDOM Qwen 3 (n_layers blocks, hidden 16) plus a word-level tokenizer built from
+    `texts`, saved to `path`: the stand-in for Qwen 3 4B in the app's tests.
+
+    12 blocks by default, so both the app's 10-block cut and the wrong 9-block cut fit
+    inside it. Built offline from a config, like make_tiny_encoder.
+    """
+    torch = pytest.importorskip("torch")
+    transformers = pytest.importorskip("transformers")
+    from tokenizers import Tokenizer, models, pre_tokenizers
+
+    words = sorted({w for t in texts for w in re.findall(r"\w+|[^\w\s]", t)})
+    vocab = ["[PAD]", "[UNK]", *words]
+    word_level = Tokenizer(models.WordLevel({w: i for i, w in enumerate(vocab)}, unk_token="[UNK]"))
+    word_level.pre_tokenizer = pre_tokenizers.Whitespace()
+    tokenizer = transformers.PreTrainedTokenizerFast(
+        tokenizer_object=word_level, pad_token="[PAD]", unk_token="[UNK]"
+    )
+    torch.manual_seed(0)
+    config = transformers.Qwen3Config(
+        vocab_size=len(vocab),
+        hidden_size=16,
+        intermediate_size=32,
+        num_hidden_layers=n_layers,
+        num_attention_heads=2,
+        num_key_value_heads=1,
+        head_dim=8,
+    )
+    transformers.AutoModel.from_config(config).save_pretrained(path)
+    tokenizer.save_pretrained(path)
+    return path
+
+
+@pytest.fixture
+def tiny_qwen(fake_train, tmp_path_factory):
+    """The folder of a tiny 12-block Qwen 3 whose vocabulary covers fake_train."""
+    return make_tiny_qwen(fake_train["text"].tolist(), tmp_path_factory.mktemp("qwen"))
+
+
 @pytest.fixture
 def tiny_encoder(fake_train, tmp_path_factory):
     """The folder of a tiny DeBERTa-style classifier whose vocabulary covers fake_train."""
