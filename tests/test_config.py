@@ -54,6 +54,14 @@ def test_shipped_encoder_configs_load():
         assert cfg.name == name and cfg.base_model == base and cfg.seed == 42
 
 
+def test_shipped_encoder_config_loads():
+    # The tuned encoder (P5 Task 5). The final notebook trains it by NAME from the
+    # installed package, so a missing or malformed file would only fail on Kaggle's GPU.
+    cfg = load_config("encoder", model_cls=EncoderConfig)
+    assert cfg.name == "encoder" and cfg.base_model == "answerdotai/ModernBERT-base"
+    assert cfg.seed == 42 and 2 <= cfg.epochs <= 5 and 5e-6 <= cfg.lr <= 1e-4
+
+
 def test_shipped_lm_blend_config_loads_with_its_text_config():
     # The offline submission loads both by NAME from the installed wheel, so a typo in
     # either file would only surface during the 9-hour scoring run.

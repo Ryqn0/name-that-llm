@@ -1,0 +1,19 @@
+# The tuned encoder: ModernBERT-base fine-tuned as an 18-way classifier (P5 Task 5).
+# Chosen by notebooks/08-encoder-tune (run v1 of 2026-10-26):
+#   - The rematch: DeBERTa-v3-base at ModernBERT's settings scored seed-7 CV 0.171, against
+#     ModernBERT's 0.344, so ModernBERT is the encoder we tune.
+#   - The search: 10 Optuna trials on proxy folds 0 and 1 of the seed-7 split. The best
+#     scored 0.374, against 0.344 for the default (trial 0).
+# The +0.030 is partly luck: it's the best of 10 on two folds. The final notebook
+# re-measures it on full, fresh folds (seeds 42, 43, 44).
+# epochs 5 is the top of the search range, so more epochs might help further (IDEAS I-020).
+name: encoder
+base_model: answerdotai/ModernBERT-base
+max_length: 512
+batch_size: 16
+lr: 4.367369144823478e-05
+epochs: 5
+warmup_ratio: 0.10769917408208673
+weight_decay: 0.01
+n_splits: 5
+seed: 42
