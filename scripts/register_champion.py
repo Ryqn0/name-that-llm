@@ -17,7 +17,7 @@ The MLflow server comes from the environment: MLFLOW_TRACKING_URI, MLFLOW_TRACKI
 and MLFLOW_TRACKING_PASSWORD (a DagsHub token, which the user sets; never printed).
 Nothing here prints a passage: only counts and scores, like everything in this repo.
 
-Usage:
+Usage (on Windows add -X utf8, since MLflow prints an emoji that cp1252 can't encode):
   python scripts/register_champion.py --lm-features-dir DIR --encoder-final-dir DIR [--dry-run]
 """
 

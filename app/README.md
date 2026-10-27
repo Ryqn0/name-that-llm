@@ -15,6 +15,11 @@ short_description: Which of 18 LLMs wrote this passage? A Kaggle model, live.
 Paste a passage written by an AI chatbot, and the app ranks which of 18 language models most
 likely wrote it, with a percentage for each.
 
+> **Not hosted for now.** Hugging Face needs a PRO subscription for Docker Spaces, so this
+> full app runs locally, from the repo or its Docker image. The free public demo runs the
+> lighter word-and-character model in your browser:
+> [Ryqn/name-that-llm](https://huggingface.co/spaces/Ryqn/name-that-llm).
+
 It runs the best model of a learning-in-public project built for the Kaggle competition
 [Name That LLM](https://www.kaggle.com/competitions/name-that-llm). The code, the experiments
 and a diary of every step are on [GitHub](https://github.com/Ryqn0/name-that-llm).
@@ -76,9 +81,8 @@ passages that are named correctly.
 
 ## Speed
 
-About 4 to 5 seconds per passage on the Space's 2 CPU cores, one passage at a time. When the
-Space has been asleep, the first visit wakes it up, and loading the models then takes a few
-minutes.
+About 4 seconds per passage on 2 CPU threads, one passage at a time (measured: 3.7 s on a
+laptop). At start-up, loading the models from the registry takes about 75 seconds.
 
 ## Limitations
 

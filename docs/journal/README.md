@@ -31,6 +31,7 @@ extension.
 
 ## Journals
 
+- [P4: the app and continuous deployment](p4-app.md) (2026-10-26 → 27)
 - [P5: fine-tuned encoders](p5-encoders.md) (2026-10-25 → 26)
 - P0 to P3b: not written. Their detail is in the DIARY, the plans and the pull requests
   (#1 to #21), and the full sessions are in the transcripts.
