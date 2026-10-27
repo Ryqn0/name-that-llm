@@ -2,12 +2,15 @@ import subprocess
 import sys
 
 import numpy as np
+import pandas as pd
 import pytest
 
+import name_that_llm.train as train_module
 from name_that_llm.config import load_config
+from name_that_llm.cv import make_folds
 from name_that_llm.data import LABELS
 from name_that_llm.metrics import score
-from name_that_llm.train import main, run_cv, run_cv_features
+from name_that_llm.train import main, run_cv, run_cv_features, run_cv_pool
 
 
 def _cfg(name):
@@ -86,3 +89,41 @@ def test_text_paths_never_import_torch_or_optuna():
         "assert not {'torch', 'optuna', 'transformers', 'name_that_llm.tune'} & set(sys.modules)"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_run_cv_pool_without_pool_matches_run_cv(fake_train):
+    cfg = _cfg("lr")
+    np.testing.assert_allclose(run_cv_pool(cfg, fake_train).oof, run_cv(cfg, fake_train).oof)
+
+
+def test_run_cv_pool_trains_only_on_allowed_pool_rows(fake_train, monkeypatch):
+    # P7's no-leak rule: a fold never trains on pool passages about its validation prompts.
+    seen = []  # the texts each fold's model was fit on
+
+    class Spy:  # a stand-in model: records its training texts, predicts uniform
+        def fit(self, X, y):
+            seen.append(set(X))
+            self.classes_ = np.array(LABELS)
+            return self
+
+        def predict_proba(self, X):
+            return np.full((len(X), 18), 1 / 18)
+
+    monkeypatch.setattr(train_module, "build_model", lambda cfg: Spy())
+    pool = pd.DataFrame(
+        {
+            "text": [f"pooltag{p}" for p in range(6)],
+            "model": LABELS[0],
+            "source": "s",
+            "prompt_id": [f"prompt{p}" for p in range(6)],
+        }
+    )
+    cfg = _cfg("lr")
+    run_cv_pool(cfg, fake_train, pool)
+    folds = make_folds(fake_train, cfg.n_splits, cfg.seed).to_numpy()
+    assert len(seen) == cfg.n_splits
+    for k, texts in enumerate(seen):
+        held_out = set(fake_train["prompt_id"][folds == k])
+        assert not {f"pooltag{p.removeprefix('prompt')}" for p in held_out} & texts
+        # and the other prompts' pool rows DO train it
+        assert {f"pooltag{p}" for p in range(6) if f"prompt{p}" not in held_out} <= texts

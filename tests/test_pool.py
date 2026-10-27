@@ -140,3 +140,31 @@ def test_build_pool_credits_each_row_to_its_original_source(fake_train, tmp_path
     out = build_pool(sources, tmp_path, fake_train)
     assert list(out.columns) == ["text", "model", "source", "prompt_id"]
     assert sorted(out.source) == ["a/one", "a/one", "b/two"]
+
+
+def test_build_pool_keeps_only_included_original_sources(fake_train, tmp_path):
+    # P7 Task 3 keeps a LIST of the merged pool's original datasets (an allowlist: a source
+    # added in a later version stays out until it's checked). Copies and label conflicts
+    # are still judged across EVERY source: "b/two" labels a's second text differently, so
+    # that text goes too, although "b/two" itself isn't kept.
+    folder = tmp_path / "owner__fake-pool"
+    folder.mkdir()
+    sentence = "Sleep matters because the brain sorts the day's memories at night. "
+    pd.DataFrame(
+        {
+            "text": [sentence * 4, sentence * 5, sentence * 6, sentence * 5],
+            "model": ["kimi-k3", "gpt-5.5", "qwen3.8-max", "gemini-3.7-flash"],
+            "source_dataset": ["a/one", "a/one", "b/two", "b/two"],
+        }
+    ).to_parquet(folder / "pool.parquet")
+    source = PoolSource(
+        slug="owner/fake-pool",
+        files="*.parquet",
+        text="text",
+        model="model",
+        source_column="source_dataset",
+        include=["a/one"],
+    )
+    pool = build_pool([source], tmp_path, fake_train)
+    assert list(pool.source) == ["a/one"]
+    assert list(pool.model) == ["kimi-k3"]
