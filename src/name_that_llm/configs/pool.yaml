@@ -1,0 +1,14 @@
+# The pool of generated passages (P7, design §3): public Kaggle datasets with an explicit
+# open license. scripts/build_pool.py checks each license again before downloading.
+#
+# P7 Task 2 (2026-10-27): the merged open pool is the single source. It already merges every
+# open-licensed candidate we inspected (29+ datasets, each row credited to its original
+# dataset in `source_dataset`), and it excludes the ones with an unknown or "other" license.
+# Version used: ntl_open_pool.parquet, 246,978 rows, 128,431,676 bytes, downloaded 2026-10-27.
+sources:
+- slug: crtproduction/name-that-llm-open-pool
+  files: "*.parquet"
+  text: text
+  model: model
+  source_column: source_dataset
+  keep: true
