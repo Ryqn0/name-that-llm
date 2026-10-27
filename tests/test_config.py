@@ -6,6 +6,7 @@ from name_that_llm.config import (
     EncoderConfig,
     EnsembleConfig,
     ExperimentConfig,
+    LLMConfig,
     load_config,
 )
 
@@ -78,3 +79,11 @@ def test_shipped_lm_blend_config_loads_with_its_text_config():
     cfg = load_config("lm_blend", model_cls=BlendConfig)
     assert cfg.name == "lm_blend" and cfg.lm_variation == "4b-base"
     assert load_config(cfg.text_config).name == cfg.text_config
+
+
+def test_shipped_llm_config_loads():
+    # The GPU notebooks train the LLM by NAME from the installed package (P7), and override
+    # base_model with the mounted Kaggle Models folder. Pool-free unless a notebook says so.
+    cfg = load_config("llm", model_cls=LLMConfig)
+    assert cfg.name == "llm" and cfg.base_model == "Qwen/Qwen3-8B-Base"
+    assert cfg.load_in_4bit and cfg.pool_size == 0 and cfg.seed == 42

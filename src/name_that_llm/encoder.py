@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from name_that_llm.config import EncoderConfig
+from name_that_llm.config import EncoderConfig, LLMConfig
 from name_that_llm.cv import make_folds
 from name_that_llm.labels import LABELS
 from name_that_llm.lm import _dtype_kwargs
@@ -72,7 +72,7 @@ def load_encoder(name_or_path: str | Path, device: str | None = None):
 
 
 def train_encoder(
-    model, tokenizer, texts: Sequence[str], y: np.ndarray, cfg: EncoderConfig
+    model, tokenizer, texts: Sequence[str], y: np.ndarray, cfg: EncoderConfig | LLMConfig
 ) -> list[float]:
     """Fine-tune `model` in place on (texts, y); returns the mean training loss per epoch.
 
@@ -89,6 +89,8 @@ def train_encoder(
         spread through the weights and quietly turn every later prediction into garbage.
     The number of epochs is FIXED (cfg.epochs): no early stopping on the validation fold,
     which would leak that fold into its own OOF score.
+    Only the parameters that require gradients are optimized and clipped: every one of an
+    encoder's, but only the adapters and the head of a LoRA'd LLM (P7, llm.py).
     """
     import torch
 
@@ -97,7 +99,8 @@ def train_encoder(
     labels = torch.tensor([LABELS.index(v) for v in y])  # an unknown label raises ValueError
     total = cfg.epochs * math.ceil(len(texts) / cfg.batch_size)
     warmup = int(cfg.warmup_ratio * total)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    params = [p for p in model.parameters() if p.requires_grad]
+    optimizer = torch.optim.AdamW(params, lr=cfg.lr, weight_decay=cfg.weight_decay)
 
     def lr_factor(step: int) -> float:
         """The share of cfg.lr at `step`: ramps 0 -> 1 during warmup, then 1 -> 0."""
@@ -133,7 +136,7 @@ def train_encoder(
                 )
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)  # back to true gradients, so clipping sees them
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            torch.nn.utils.clip_grad_norm_(params, 1.0)
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad(set_to_none=True)
@@ -245,19 +248,24 @@ def run_cv_encoder(cfg: EncoderConfig, df: pd.DataFrame, save_dir: Path | None =
 
 
 def find_fold_dirs(
-    root: Path = Path("/kaggle/input"), name: str = "encoder", n_folds: int = 5
+    root: Path = Path("/kaggle/input"),
+    name: str = "encoder",
+    n_folds: int = 5,
+    marker: str = "config.json",
 ) -> list[Path]:
     """The saved fold models under `root` (folders */<name>/fold<k>/), in fold order.
 
     Searched, never hard-coded: Kaggle mounts an attached notebook's output under a path
     that has changed before. Anything other than exactly n_folds models is an error.
-    Averaging 4 of 5 models would silently change the submission.
+    Averaging 4 of 5 models would silently change the submission. `marker` is the file
+    that makes a folder a fold model: an encoder's config.json, or an LLM adapter's
+    adapter_config.json (P7).
     """
     root = Path(root)
     dirs = sorted(
         {
             p.parent
-            for p in root.rglob("config.json")
+            for p in root.rglob(marker)
             if re.fullmatch(r"fold\d+", p.parent.name) and p.parent.parent.name == name
         },
         key=lambda d: int(d.name.removeprefix("fold")),
@@ -265,8 +273,8 @@ def find_fold_dirs(
     if len(dirs) != n_folds:
         raise FileNotFoundError(
             f"expected {n_folds} fold models under {root} (folders */{name}/fold<k>/ with a "
-            f"config.json), found {len(dirs)}: {[str(d) for d in dirs]}. "
-            "Is the encoder-final notebook attached?"
+            f"{marker}), found {len(dirs)}: {[str(d) for d in dirs]}. "
+            "Is the final notebook that trained them attached?"
         )
     return dirs
 

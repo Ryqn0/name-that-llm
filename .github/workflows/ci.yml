@@ -56,9 +56,10 @@ jobs:
           uv run --with "pandas==2.3.3" --with "numpy==2.1.3" --with "scikit-learn==1.6.1"
           pytest -q
 
-  # The model tests (LM features, encoder fine-tuning, encoder tuning) need torch and
-  # transformers, which aren't package dependencies (ADR 0002): the jobs above skip them.
-  # This job installs them so those tests RUN on every PR, on tiny random models on CPU.
+  # The model tests (LM features, encoder fine-tuning, encoder tuning, the LoRA'd LLM) need
+  # torch, transformers and peft, which aren't package dependencies (ADR 0002): the jobs
+  # above skip them. This job installs them so those tests RUN on every PR, on tiny random
+  # models on CPU. (bitsandbytes' 4 bits need CUDA: the GPU notebooks exercise them.)
   torch:
     runs-on: ubuntu-latest
     steps:
@@ -70,13 +71,13 @@ jobs:
       # The CPU-only wheel (~200 MB). The default PyPI wheel bundles CUDA (~2.5 GB) that a
       # CI machine without a GPU would never use.
       - run: uv pip install torch --index-url https://download.pytorch.org/whl/cpu
-      - run: uv pip install transformers
+      - run: uv pip install transformers peft
       # --no-sync: keep the packages installed above (a sync would remove them). If this
       # import works, the tests' importorskip can't skip.
-      - run: uv run --no-sync python -c "import torch, transformers"
+      - run: uv run --no-sync python -c "import torch, transformers, peft"
       - run: >-
           uv run --no-sync pytest -q tests/test_lm.py tests/test_encoder.py tests/test_tune.py
-          tests/test_champion.py tests/test_registry.py
+          tests/test_champion.py tests/test_registry.py tests/test_llm.py
 
   # The live app's image (P4): it must build, carry Kaggle's torch and transformers (the
   # versions the champion was trained and checked with), import the app, and never contain

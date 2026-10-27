@@ -85,7 +85,7 @@ def test_text_paths_never_import_torch_or_optuna():
     code = (
         "import sys, name_that_llm.submit, name_that_llm.train, name_that_llm.blend, "
         "name_that_llm.encoder, name_that_llm.champion, name_that_llm.balance, "
-        "name_that_llm.pool; "
+        "name_that_llm.pool, name_that_llm.llm; "
         "assert not {'torch', 'optuna', 'transformers', 'name_that_llm.tune'} & set(sys.modules)"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
