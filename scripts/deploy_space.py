@@ -7,9 +7,11 @@ browser. On every merge to main that touches the demo, GitHub Actions runs this 
      engine, the model card, the model files, and version.json (this commit and that run);
   3. the Space is created if needed (static, public), and the folder is uploaded;
   4. wait_until_live polls the site until its version.json names this commit;
-  5. smoke_test checks that the site serves exactly the uploaded files, byte for byte (a
-     large file served as a Git LFS pointer, or a stale cached copy, would fail here), then
-     runs the engine on them under Node, on a passage written for the purpose.
+  5. smoke_test checks that the site serves the uploaded files: the engine, the model and
+     version.json byte for byte (a large file served as a Git LFS pointer, or a stale cached
+     copy, would fail here), and the page whole, plus the tags Hugging Face adds to its
+     <head>. Then it runs the engine on them under Node, on a passage written for the
+     purpose. The model card is skipped: the site serves it rendered as HTML.
 
 Settings come from the environment (GitHub Secrets and Variables): HF_TOKEN, HF_SPACE
 ("owner/name"), GITHUB_SHA, and the MLflow server's MLFLOW_TRACKING_URI,
@@ -99,14 +101,34 @@ def wait_until_live(api, space: str, commit: str, timeout: float = 900, every: f
     sys.exit(f"STOP: {commit[:7]} wasn't live after {timeout / 60:.0f} minutes")
 
 
+def served_intact(ours: bytes, live: bytes) -> bool:
+    """True if `live` is `ours` plus insertions only: every line of ours, in order.
+
+    Hugging Face adds tags to a static page's <head> (a script with the Space's variables,
+    social-preview <meta> tags), so a served page is never byte-identical to the upload.
+    """
+    at = 0
+    for line in ours.splitlines():
+        at = live.find(line, at)
+        if at < 0:
+            return False
+        at += len(line)
+    return True
+
+
 def smoke_test(host: str, staged: Path) -> None:
-    """The site serves exactly the uploaded files, and the engine works on them."""
+    """The site serves the uploaded files, and the engine works on them."""
     for path in sorted(staged.iterdir()):
-        live = _get(f"{host}/{path.name}")
-        if live.status_code != 200 or live.content != path.read_bytes():
+        if path.name == "README.md":  # served rendered as HTML; the page never loads it
+            continue
+        live, ours = _get(f"{host}/{path.name}"), path.read_bytes()
+        # The page gets Hugging Face's tags added; every other file must be exact.
+        exact = path.suffix != ".html"
+        intact = live.content == ours if exact else served_intact(ours, live.content)
+        if live.status_code != 200 or not intact:
             sys.exit(
                 f"STOP: the site's {path.name} isn't the uploaded file (HTTP "
-                f"{live.status_code}, {len(live.content):,} bytes, not {path.stat().st_size:,})"
+                f"{live.status_code}, {len(live.content):,} bytes, not {len(ours):,})"
             )
     # The site's bytes are the staged ones, and the staged ntl.js is the repo's, so the
     # repo's engine on the staged model files is exactly what visitors run.
@@ -117,7 +139,7 @@ def smoke_test(host: str, staged: Path) -> None:
         sys.exit("STOP: the engine didn't give 18 probabilities summing to 1")
     labels = json.loads((staged / "model.json").read_text(encoding="utf-8"))["labels"]
     best = max(range(18), key=probabilities.__getitem__)
-    print(f"smoke test: {labels[best]} ({probabilities[best]:.0%}); every file identical")
+    print(f"smoke test: {labels[best]} ({probabilities[best]:.0%}); the site serves our files")
 
 
 def main() -> None:

@@ -1,9 +1,10 @@
 """Tests for the deploy script (P4 revision): what goes to the public Hugging Face Space.
 
-The upload needs a token and the network, so the live deploy checks it: every live file must
-be byte-identical to the uploaded one, and the engine must work on them under Node. What can
-break silently is tested here: the wrong files reaching the public Space, above all the
-competition data, and the wrong model run named on the page.
+The upload needs a token and the network, so the live deploy checks it: the live files must
+match the uploaded ones, and the engine must work on them under Node. What can break
+silently is tested here: the wrong files reaching the public Space, above all the
+competition data; the wrong model run named on the page; and the page check, which must
+accept Hugging Face's added tags but nothing else.
 """
 
 import importlib.util
@@ -61,3 +62,18 @@ def test_stage_space_copies_only_the_demo_files(deploy, tmp_path):
     assert (tmp_path / "space" / "README.md").read_text() == "the demo's model card"
     version = json.loads((tmp_path / "space" / "version.json").read_text())
     assert version == {"commit": "abc1234", "model_run": "run123"}
+
+
+def test_served_intact_allows_only_insertions(deploy):
+    # Hugging Face adds tags to a static page's <head> (seen on the live Space: a script with
+    # the Space's variables, social-preview <meta> tags). Our page must still be there whole;
+    # a stale copy, or one missing a line, must not pass.
+    ours = b"<html>\n<head>\n<title>x</title>\n</head>\n<body>new</body>\n</html>\n"
+    live = (
+        b"<html>\n<head><script>window.huggingface={variables:{}};</script>\n"
+        b'<title>x</title>\n<meta property="og:title" content="t"></head>\n'
+        b"<body>new</body>\n</html>\n"
+    )
+    assert deploy.served_intact(ours, live)
+    assert not deploy.served_intact(ours, live.replace(b"new", b"old"))
+    assert not deploy.served_intact(ours, live.replace(b"<title>x</title>\n", b""))
