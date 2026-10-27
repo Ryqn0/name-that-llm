@@ -2,6 +2,50 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-10-26 → 27 · Session 7: the app, the registry, and a free demo in the browser (P4)
+
+**Did**
+- **Built the app around the real champion:**
+  - `flatten_text` turns pasted chatbot markdown into a plain paragraph;
+  - Qwen is cut to the 10 blocks the LM head reads;
+  - the `Champion` predictor gives data-driven "How sure?" bands;
+  - a FastAPI app serves the page (layout B), and its Docker image is built in CI.
+- **Registered the champion** in a private MLflow registry on DagsHub (`name-that-llm`
+  v1 `@champion`), after every check passed. Qwen's CPU features match the Kaggle GPU
+  ones (median difference 0.0010, the same top label 20 of 20), and parity was 50 of 50.
+- **The first deploy hit Hugging Face's new paywall** for Docker Spaces (402). You chose
+  the lighter free demo: a static Space whose page runs `lr` in the visitor's browser.
+- **Built that demo:**
+  - ported `lr` to JavaScript (`ntl.js`), with parity tests under Node;
+  - exported it as a pinned MLflow run;
+  - built the static page and its continuous deployment, which ends in a smoke test of
+    the live site.
+- **Looked at the page** in headless Edge (Playwright), which found two layout bugs, both
+  fixed. Then published it: <https://huggingface.co/spaces/Ryqn/name-that-llm>.
+
+**Learned**
+- **The 9-block trap:** the last hidden state Transformers returns is normalized, so
+  reading layer 9 means keeping 10 blocks.
+- **CPU float32 features match Kaggle's GPU float16 ones** within 0.1% (median), with the
+  same LM-head top label. So the app runs the leaderboard model, not an approximation.
+- **Hosting terms change.** Free Docker Spaces now need PRO; static Spaces are still free.
+  A model small enough for the browser costs nothing to serve, keeps every text on the
+  visitor's device, and answers in 0.01 s.
+- **`lr` alone is far less sure of itself than the champion**, so it needs its own bands.
+  Its "Fairly sure" starts at a top probability of 0.152 (right 47% of the time), against
+  the champion's 0.268.
+- **A static host rewrites files.** Hugging Face serves `README.md` rendered as HTML and
+  adds tags to the page's `<head>`. The smoke test now allows exactly that, and nothing
+  more.
+- **Look at the page.** Every HTTP check passed while the bars were misaligned, and nearly
+  invisible on phones. Two screenshots found both bugs.
+
+**Scores:** unchanged. The champion `ensemble` stays at public LB 0.410. The public demo
+runs `lr` (LB 0.320, CV 0.325).
+
+**Next:** choose the next phase. P7 (LLM and ensemble) is the score lever. P6 (the MLOps
+loop) needs a rethink first, since the public demo has no server to monitor.
+
 ## 2026-10-25 → 26 · Session 6: a fine-tuned encoder joins the ensemble (P5)
 
 **Did**

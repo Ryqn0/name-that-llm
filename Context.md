@@ -36,18 +36,22 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 ## Status
 
-- Phase: **P5 done** (2026-10-26): fine-tuned encoders
-  ([plan](docs/superpowers/plans/2026-10-25-p5-encoders.md)). **Next: P4**, App v1 and CD
-  (the user chose P5, then P4, on 2026-10-25).
-  - ModernBERT-base beat DeBERTa-v3-base: seed-7 CV 0.344 against 0.206, and DeBERTa scored
-    0.171 even at ModernBERT's settings. Tuning chose lr 4.4e-5 and 5 epochs
-    (`configs/encoder.yaml`).
-  - The three-model ensemble passed the A/B gate on fresh folds, then scored **public LB
-    0.410** (+0.021 over `lm_blend`'s 0.389): the new champion (`configs/ensemble.yaml`).
-  - P5 used about 4.1 of its 8 GPU-hours. Kaggle's T4 accelerator provides **2 GPUs**; we
-    use one so far (I-019).
-  - Before that, P3 was completed: P3a (prompt assignment) and P3b (LM features, then
-    tuning, [plan](docs/superpowers/plans/2026-10-24-p3b-lm-features.md)).
+- Phase: **P4 done** (2026-10-27): App v1 and CD
+  ([plan](docs/superpowers/plans/2026-10-26-p4-app.md),
+  [journal](docs/journal/p4-app.md)). **Next:** the user picks P6 (the MLOps loop) or P7
+  (LLM and ensemble).
+  - **The free public demo is live:** <https://huggingface.co/spaces/Ryqn/name-that-llm>.
+    It's a static Space: the page runs `lr` in the visitor's browser (`app/demo/ntl.js`,
+    parity-tested against scikit-learn), so the text never leaves the device. Its model is
+    the MLflow run pinned in `app/demo/MODEL_RUN`. Every merge touching `app/demo/`
+    redeploys and smoke-tests it ([ADR 0005](docs/adr/0005-public-demo-runs-in-the-browser.md)).
+  - **The full champion** is `name-that-llm` v1 `@champion` in the private DagsHub
+    registry. The FastAPI app and its Docker image run it on CPU, about 3.7 s a passage
+    ([ADR 0004](docs/adr/0004-serve-the-champion-on-cpu.md)). It runs locally only: since
+    2026, Hugging Face needs PRO for Docker Spaces (I-026).
+  - Before that, P5 (fine-tuned encoders, which gave the champion LB 0.410) and P3 (prompt
+    assignment, then LM features) were completed. Kaggle's T4 accelerator provides
+    **2 GPUs**; we use one so far (I-019).
 - **Lessons so far:**
   - P0–P2: public LB **0.320** against CV 0.321, so **the backtest tracks the leaderboard**.
   - P3a: per-prompt assignment lifted CV from 0.321 to 0.406, but the LB stayed at 0.320.
@@ -61,6 +65,9 @@ outputs are a public repo, a progress diary, and a live demo app.
     so a 15% share lifts the blend: +0.021 on fresh folds, and +0.021 on the public LB. The
     CV–LB gap held at −0.013. Fine-tuning is noisy (identical runs differed by 0.014 on two
     folds), so a small tuning gain needs a second seed (I-022).
+  - P4: hosting terms change, so check them early: free Docker Spaces disappeared behind a
+    paywall. A model small enough for the browser costs nothing to serve. And look at the
+    page: a headless browser found two layout bugs that every HTTP check had passed.
 - **Leaderboard snapshot, 2026-10-26:** 3,387 teams; median 0.532; top-10% cutoff 0.641;
   best 0.710. With 0.410 we're about 2,236th (about 2,219th on 2026-10-25, with 0.389).
 - Champion: **`ensemble`** (since 2026-10-26), a weighted mean of three models'
@@ -127,6 +134,15 @@ CV = the seed-42 folds, the same for every row.
     rejected `"MIT"` with a generic server error. The description states MIT.
   - The workflow uses the secret `KAGGLE_API_TOKEN`, a **dedicated** Kaggle token for
     GitHub Actions, so revoking it never breaks the local token.
+- **Demo deploy (CD):** merging a change under `app/demo/` (or to `scripts/deploy_space.py`
+  or its workflow) redeploys the static Space through `deploy-app`, which ends with a smoke
+  test of the live site.
+  - **A new demo model:** run `python -X utf8 scripts/export_browser_model.py`
+    (`--dry-run` first), then commit the `app/demo/MODEL_RUN` it writes. Update the
+    numbers in `app/demo/README.md` by hand.
+- **A new champion version:** `python -X utf8 scripts/register_champion.py` with the
+  DagsHub env loaded. MLflow prints an emoji, which Windows' cp1252 can't write without
+  `-X utf8`.
 - **Lesson (P3a):** before trusting any trick that exploits prompt structure, re-measure
   it on subsampled layouts (m = 1, 2, 3, 6 answers per prompt), because the hidden test
   is not laid out like train.
@@ -147,6 +163,10 @@ CV = the seed-42 folds, the same for every row.
   - uv's TLS errors, via `UV_SYSTEM_CERTS`
   - Python's TLS errors, via a combined certificate bundle at `~/.certs/combined-ca.pem`
 - Kaggle notebooks and GitHub Actions aren't affected.
+- **Avast also cuts large transfers over localhost** (a 13.5 MB file, 4 times out of 4). To
+  look at a local page, drive headless Edge with Playwright and answer its requests from
+  the folder (`uv run --no-project --with playwright`, `channel="msedge"`), rather than
+  serving it.
 - **Package floors are kept loose on purpose:** Kaggle's preinstalled versions are older,
   and the offline notebook can't upgrade them (see the comment in `pyproject.toml`).
 
@@ -162,7 +182,16 @@ CV = the seed-42 folds, the same for every row.
   - Runs: [forge.coreweave.com/wandb/dungryan0-ryan-dung/name-that-llm](https://forge.coreweave.com/wandb/dungryan0-ryan-dung/name-that-llm).
     W&B now runs on CoreWeave's domain, and wandb 0.31 stores its login under
     `api.forge.coreweave.com` in `~/_netrc`.
-- Later: DagsHub (MLflow), Hugging Face (`HF_TOKEN`), Grafana Cloud.
+- DagsHub `Ryqn0`: the **private** repo `Ryqn0/name-that-llm`, home of the MLflow registry
+  (`name-that-llm` v1 `@champion`) and the experiment `browser-demo`. Locally, the
+  `MLFLOW_TRACKING_URI`, `_USERNAME` and `_PASSWORD` variables come from
+  `C:\Users\dungr\.dagshub.env`, outside the repo; load it with a `while read` loop that
+  also reads a last line without a newline. In GitHub: the secret `DAGSHUB_TOKEN` and the
+  variables `DAGSHUB_USER` and `MLFLOW_TRACKING_URI`.
+- Hugging Face `Ryqn` (not `Ryqn0`): the public static Space `Ryqn/name-that-llm`. In
+  GitHub: the secret `HF_TOKEN` and the variable `HF_SPACE`. The variable `ENCODER_FOLDS`
+  is left over from the Docker deploy, and unused.
+- Later: Grafana Cloud.
 
 ## Rules checklist
 
@@ -180,29 +209,17 @@ CV = the seed-42 folds, the same for every row.
 
 ## Next steps
 
-State on 2026-10-26 (late): **P4 in progress** ([design](docs/superpowers/specs/2026-10-26-p4-app-design.md),
-[plan](docs/superpowers/plans/2026-10-26-p4-app.md); ledger in
-`.superpowers/sdd/2026-10-26-p4-app/progress.md`). P5 is done (champion LB 0.410).
+State on 2026-10-27: **P4 is done**
+([journal](docs/journal/p4-app.md)). The free demo is live, and the champion (LB 0.410)
+is registered and runs locally.
 
-1. **P4, where it stands:**
-   - **Done and merged** (Tasks 1–6, PRs #31–#36): `flatten_text`, the 10-block Qwen
-     loader, the `Champion` predictor with its "How sure?" bands, the MLflow packaging and
-     registration script, the FastAPI app and its page, and the Docker image (built in CI).
-   - **Task 7 done:** `name-that-llm` v1 is `@champion` in the private DagsHub registry
-     `Ryqn0/name-that-llm`. The token lives in `C:\Users\dungr\.dagshub.env`, outside the
-     repo. Every check passed: the Hub's Qwen matches the Kaggle features, and parity is 50
-     of 50.
-   - **Task 8 (CD) merged, then blocked:** Hugging Face now charges for Docker Spaces (PRO).
-     The user chose the **lighter free demo** (design §12): a static Space running only
-     `lr`, in the browser.
-   - **Task 8a in progress** (branch `p4-08a-engine`, pushed, not merged): the JavaScript
-     engine `app/demo/ntl.js`, which passes its parity tests (16 passed), and the export
-     `name_that_llm.browser`. Next, ship 8a (a PR with a CI-gated merge), then 8b (export
-     `lr` with its own bands, as a pinned MLflow run), then 8c (the static page and its
-     deploy; GitHub variable `HF_SPACE` = `Ryqn/name-that-llm`), then Task 9 (the docs and
-     the journal).
-   - **Note:** run the registration script with `python -I -X utf8`. MLflow prints an emoji,
-     which Windows' cp1252 can't write.
+1. **Choose the next phase:**
+   - **P7, LLM and ensemble:** the score lever. The top-10% cutoff is 0.641, against our
+     0.410.
+   - **P6, the MLOps loop:** monitoring, online A/B, continuous training. Its monitoring
+     was designed around a hosted server, but the public demo now runs in the browser and
+     has none. So P6 needs a rethink first: monitor the full app locally, or host it
+     (I-026). I-024 and I-025 belong there.
 2. **Fix W&B in the GPU notebooks:** every pushed P5 run printed "W&B tracking is OFF
    (ConnectionError)", so P5 has no W&B runs. Most likely the Kaggle Secret
    `WANDB_API_KEY` must be attached to each notebook once, in the Kaggle editor
@@ -210,3 +227,6 @@ State on 2026-10-26 (late): **P4 in progress** ([design](docs/superpowers/specs/
 3. Cheap follow-ups: I-015 (calibrated or log blend, in P7's M6 ensemble), I-017 (TF
    without IDF), I-018 (the weight grid inside each Optuna trial), I-020 and I-022 (encoder
    tuning: more epochs, and the noise floor).
+4. **Optional:** tag `v0.8.0` (`pyproject.toml` already says 0.8.0). It would publish the
+   Kaggle lib dataset, which needs the user's OK, but the offline notebook needs nothing
+   from P4.
