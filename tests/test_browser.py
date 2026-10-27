@@ -8,22 +8,20 @@ skip where Node isn't installed (it is on GitHub's CI machines).
 
 import json
 import shutil
-import subprocess
-from pathlib import Path
 
 import numpy as np
 import pytest
 
-from name_that_llm.browser import export_browser_model
+from name_that_llm.browser import export_browser_model, run_engine
 from name_that_llm.champion import Band
 from name_that_llm.config import load_config
 from name_that_llm.data import LABELS, flatten_text
 from name_that_llm.models import build_model
 from name_that_llm.submit import _aligned_proba
 
-CLI = Path(__file__).resolve().parents[1] / "app" / "demo" / "cli.mjs"
-NODE = shutil.which("node")
-needs_node = pytest.mark.skipif(NODE is None, reason="the browser engine's tests need Node")
+needs_node = pytest.mark.skipif(
+    shutil.which("node") is None, reason="the browser engine's tests need Node"
+)
 BANDS = [Band("Fairly sure", 0.2, 0.6), Band("Unsure", 0.1, 0.4), Band("Very unsure", 0.0, 0.2)]
 
 # Text a visitor might paste: markdown of every kind, training-style text that must
@@ -50,19 +48,6 @@ TEXTS = [
 ]
 
 
-def run_js(command: str, payload: dict) -> dict:
-    """Call the Node harness: JSON in on stdin, JSON out on stdout."""
-    done = subprocess.run(
-        [NODE, str(CLI), command],
-        input=json.dumps(payload),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        check=True,
-    )
-    return json.loads(done.stdout)
-
-
 @pytest.fixture
 def exported(fake_train, tmp_path):
     """`lr` fit on the fake data, exported the way the demo's model is: (model, folder)."""
@@ -73,13 +58,13 @@ def exported(fake_train, tmp_path):
 
 @needs_node
 def test_js_flatten_matches_python():
-    assert run_js("flatten", {"texts": TRICKY})["texts"] == [flatten_text(t) for t in TRICKY]
+    assert run_engine("flatten", {"texts": TRICKY})["texts"] == [flatten_text(t) for t in TRICKY]
 
 
 @needs_node
 def test_js_probabilities_match_sklearn(exported):
     lr, folder = exported
-    js = np.array(run_js("predict", {"model": str(folder), "texts": TEXTS})["probabilities"])
+    js = np.array(run_engine("predict", {"model": str(folder), "texts": TEXTS})["probabilities"])
     expected = _aligned_proba(lr, [flatten_text(t) for t in TEXTS])
     np.testing.assert_allclose(js, expected, atol=1e-5)
 

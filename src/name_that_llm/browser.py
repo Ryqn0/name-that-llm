@@ -17,6 +17,8 @@ loudly, rather than silently giving different numbers in the browser.
 """
 
 import json
+import shutil
+import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -24,6 +26,10 @@ import numpy as np
 
 from name_that_llm.champion import Band
 from name_that_llm.labels import LAB_NAMES, LAB_OF, LABELS
+
+# The demo's folder in the repo: the engine (ntl.js), its Node harness (cli.mjs), the page,
+# and MODEL_RUN. Only checks run from the repo use it: an installed wheel has no app/.
+DEMO_DIR = Path(__file__).resolve().parents[2] / "app" / "demo"
 
 # What the engine implements. Every other parameter must have scikit-learn's default.
 _EXPECTED = {
@@ -94,3 +100,23 @@ def _check(union, vectorizers: dict, clf) -> None:
                 )
     if list(clf.classes_) != LABELS or clf.coef_.shape[0] != len(LABELS):
         raise ValueError("expected a multinomial logistic regression over the 18 LABELS")
+
+
+def run_engine(command: str, payload: dict) -> dict:
+    """Run the JavaScript engine under Node (app/demo/cli.mjs): JSON in, JSON out.
+
+    The page's own engine, so Python can check it against scikit-learn: the tests, and the
+    export's parity check on real passages (scripts/export_browser_model.py).
+    """
+    node = shutil.which("node")
+    if node is None:
+        raise RuntimeError("running the browser engine needs Node.js (https://nodejs.org)")
+    done = subprocess.run(
+        [node, str(DEMO_DIR / "cli.mjs"), command],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+    )
+    return json.loads(done.stdout)
