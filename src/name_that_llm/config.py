@@ -80,6 +80,35 @@ class EncoderConfig(BaseModel):
     seed: int = 42
 
 
+class LLMConfig(BaseModel):
+    """A decoder LLM (Qwen 3) fine-tuned as an 18-way classifier with LoRA (P7, llm.py).
+
+    Like P5's encoder, the network itself learns our 18 authors. But an 8-billion-weight
+    model can't be fully fine-tuned on a 16 GB T4, so its weights load in 4 bits and stay
+    frozen, and LoRA trains small updates beside them, plus the new head. llm.py explains
+    each piece. The defaults are the usual QLoRA starting points.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    base_model: str  # Hugging Face Hub id, or a folder (the notebooks' mounted Kaggle Model)
+    n_layers: int | None = None  # keep only the first n blocks (P3b: the middle ones carry style)
+    load_in_4bit: bool = True  # NF4 weights on CUDA (needs bitsandbytes); CPU loads float32
+    lora_r: int = 16  # the rank of each low-rank update, i.e. its capacity
+    lora_alpha: int = 32  # the updates are scaled by lora_alpha / lora_r
+    lora_dropout: float = 0.05
+    max_length: int = 512  # tokens per passage: ours fit, and longer ones get truncated
+    batch_size: int = 8
+    lr: float = 1e-4  # LoRA trains far fewer weights than full fine-tuning: bigger steps
+    epochs: int = 2  # FIXED, never early-stopped on the validation fold (honest OOF)
+    warmup_ratio: float = 0.05
+    weight_decay: float = 0.0
+    pool_size: int = 0  # pool passages added to each fold's training (0: pool-free)
+    n_splits: int = 5
+    seed: int = 42
+
+
 class EnsembleConfig(BaseModel):
     """Three models mixed by a weighted mean of probabilities (P5).
 
