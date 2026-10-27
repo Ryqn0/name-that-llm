@@ -1,0 +1,191 @@
+<!doctype html>
+<!-- The free demo's only page (P4 revision, design §12; layout B of design §3). A static
+     page: the TF-IDF model `lr` runs right here, in the visitor's browser, through ntl.js.
+     The page downloads its own files and sends nothing anywhere. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which LLM wrote this?</title>
+<style>
+  :root {
+    --accent: #0071e3; --bg: #f5f5f7; --card: #ffffff; --track: #e5e5e7;
+    --text: #1d1d1f; --muted: #6e6e73; --border: #d1d1d6; --warning: #ff9f0a; --error: #d70015;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --accent: #2997ff; --bg: #1d1d1f; --card: #2c2c2e; --track: #3a3a3c;
+      --text: #f5f5f7; --muted: #a1a1a6; --border: #48484a; --error: #ff6961;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 680px; margin: 0 auto; background: var(--card); border: 1px solid var(--border);
+         border-radius: 12px; padding: 20px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .muted { color: var(--muted); }
+  textarea { width: 100%; min-height: 140px; margin-top: 12px; padding: 10px; border-radius: 8px;
+             border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; resize: vertical; }
+  .row { display: flex; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+  button { padding: 9px 18px; border: 0; border-radius: 8px; background: var(--accent); color: #fff;
+           font: inherit; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: 0.6; cursor: default; }
+  button.link { background: none; color: var(--accent); padding: 0; font-weight: 400; }
+  #status { min-height: 1.5em; }
+  #status.error { color: var(--error); }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
+  .best { font-size: 26px; font-weight: 700; margin: 2px 0 6px; word-break: break-word; }
+  .best span { font-size: 15px; font-weight: 400; color: var(--muted); }
+  .pill { display: inline-block; padding: 3px 12px; border-radius: 12px; background: var(--track); }
+  .bars { display: grid; grid-template-columns: minmax(110px, auto) 82px 1fr 44px; gap: 6px 10px;
+          align-items: center; margin-top: 12px; }
+  /* One grid for all 18 rows, so every bar starts at the same place. Collapsed, only the
+     top 5 show: a row is 4 cells, so the 6th row starts at cell 21. */
+  .bars.collapsed > :nth-child(n+21) { display: none; }
+  /* Phones: the company column goes (the best guess still names it), so the bars keep room. */
+  @media (max-width: 480px) {
+    .bars { grid-template-columns: auto 1fr 40px; }
+    .bars .lab { display: none; }
+  }
+  .track { background: var(--track); border-radius: 4px; height: 10px; }
+  .fill { background: var(--accent); border-radius: 4px; height: 10px; }
+  .right { text-align: right; font-variant-numeric: tabular-nums; }
+  .warning { border-left: 4px solid var(--warning); background: var(--track); padding: 10px 14px;
+             margin-top: 18px; border-radius: 6px; }
+  .warning ul { margin: 6px 0 0; padding-left: 20px; }
+  a { color: var(--accent); }
+  footer { margin-top: 14px; font-size: 13px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Which LLM wrote this?</h1>
+  <div class="muted">Paste a passage written by an AI chatbot. The page guesses which of 18 models wrote it.</div>
+
+  <label for="text" class="muted" style="display:block;margin-top:12px">
+    The passage: 20 to 1,000 words (it works best on 50 to 300)
+  </label>
+  <textarea id="text" placeholder="Paste the passage here (Ctrl+V)…"></textarea>
+  <div class="row">
+    <button id="identify" disabled>Identify</button>
+    <span id="status" role="status" aria-live="polite">Loading the model (15 MB, only on the first visit)…</span>
+  </div>
+
+  <section id="result" hidden>
+    <hr>
+    <div class="muted">Most likely</div>
+    <div class="best" id="best"></div>
+    <span class="pill" id="sure"></span>
+    <div class="bars collapsed" id="bars"></div>
+    <div class="row"><button class="link" id="toggle">Show all 18 ▾</button></div>
+  </section>
+
+  <div class="warning">
+    <b>⚠ Before you trust this</b>
+    <ul>
+      <li><b>It is not an AI detector.</b> It only knows these 18 models and always picks one of them,
+        even for text written by a human or by another AI.</li>
+      <li>It learned from 2,699 passages from a Kaggle competition (about 150 per model), so other
+        topics or writing styles can fool it.</li>
+      <li><b>This free demo runs the lighter model</b> (word and character patterns): on new passages,
+        it names the exact model right about <span id="right">3</span> times in 10. The full model, right
+        about 4 times in 10, needs a server; it's in <a href="https://github.com/Ryqn0/name-that-llm">the repo</a>.</li>
+      <li><b>Your text never leaves your browser:</b> the model runs on your device.</li>
+    </ul>
+    <div style="margin-top:6px"><a href="https://github.com/Ryqn0/name-that-llm/blob/main/app/demo/README.md">How it works, and its limits (model card) →</a></div>
+  </div>
+  <footer class="muted" id="footer"></footer>
+</main>
+
+<script type="module">
+  import { countWords, describeConfidence, loadModel, predictProba, rank } from "./ntl.js";
+
+  const $ = (id) => document.getElementById(id);
+  const MIN_WORDS = 20, MAX_WORDS = 1000;  // the full app's limits, counted after flattening
+  let model = null;
+
+  // One bar row: model, company, bar, percentage (built with DOM calls, never innerHTML).
+  function addRow(grid, entry) {
+    const pct = (100 * entry.probability).toFixed(0) + "%";
+    const name = document.createElement("span"); name.textContent = entry.model;
+    const lab = document.createElement("span"); lab.className = "muted lab"; lab.textContent = entry.lab;
+    const track = document.createElement("div"); track.className = "track";
+    const fill = document.createElement("div"); fill.className = "fill";
+    fill.style.width = (100 * entry.probability).toFixed(1) + "%";
+    track.appendChild(fill);
+    const value = document.createElement("span"); value.className = "right"; value.textContent = pct;
+    grid.append(name, lab, track, value);
+  }
+
+  function show(ranking, band) {
+    const best = ranking[0];
+    $("best").textContent = best.model + " ";
+    const by = document.createElement("span");
+    by.textContent = "by " + best.lab + " · " + (100 * best.probability).toFixed(0) + "%";
+    $("best").appendChild(by);
+    // The same wording as the full app: the band's measured accuracy, in tenths.
+    $("sure").textContent = "How sure? " + band.label + ": at this level, the best guess is right about "
+      + Math.round(10 * band.accuracy) + " times in 10.";
+    $("bars").replaceChildren();
+    ranking.forEach((e) => addRow($("bars"), e));
+    $("bars").classList.add("collapsed"); $("toggle").textContent = "Show all 18 ▾";
+    $("result").hidden = false;
+  }
+
+  function identify() {
+    const text = $("text").value;
+    const words = countWords(text);
+    if (words < MIN_WORDS || words > MAX_WORDS) {
+      $("status").className = "error";
+      $("status").textContent = "Paste between 20 and 1,000 words; this text has " + words + ".";
+      return;
+    }
+    const start = performance.now();
+    const ranking = rank(model, predictProba(model, text));
+    show(ranking, describeConfidence(ranking[0].probability, model.bands));
+    $("status").className = "";
+    $("status").textContent = "Done in " + ((performance.now() - start) / 1000).toFixed(2) + " s, on your device.";
+  }
+
+  function ok(response) {
+    if (!response.ok) throw new Error(response.url + ": HTTP " + response.status);
+    return response;
+  }
+
+  // Load the model once: its vocabulary and settings (model.json), then its weights.
+  async function load() {
+    try {
+      const [json, weights, version] = await Promise.all([
+        fetch("model.json").then(ok).then((r) => r.json()),
+        fetch("weights.bin").then(ok).then((r) => r.arrayBuffer()),
+        fetch("version.json").then(ok).then((r) => r.json()).catch(() => ({})),
+      ]);
+      model = loadModel(json, weights);
+      $("right").textContent = Math.round(10 * json.meta.cv_balanced_accuracy);
+      // The footer says exactly what answers: the package, the registered model the
+      // weights come from, the MLflow run pinned in the repo, and the deployed commit.
+      const parts = ["name-that-llm " + json.meta.package_version,
+                     "lr from model v" + json.meta.source.split("/").pop()];
+      if (version.model_run) parts.push("run " + version.model_run.slice(0, 7));
+      if (version.commit) parts.push("commit " + version.commit.slice(0, 7));
+      $("footer").textContent = parts.join(" · ");
+      $("status").textContent = "";
+      $("identify").disabled = false;
+    } catch (error) {
+      console.error(error);
+      $("status").className = "error";
+      $("status").textContent = "The model didn't load: reload the page to try again.";
+    }
+  }
+
+  $("identify").addEventListener("click", identify);
+  $("toggle").addEventListener("click", () => {
+    const collapsed = $("bars").classList.toggle("collapsed");
+    $("toggle").textContent = collapsed ? "Show all 18 ▾" : "Show the top 5 ▴";
+  });
+  load();
+</script>
+</body>
+</html>

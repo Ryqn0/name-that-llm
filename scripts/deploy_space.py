@@ -1,23 +1,25 @@
-"""Deploy the live app to its Hugging Face Space (P4): run by .github/workflows/deploy-app.yml.
+"""Deploy the free demo to its Hugging Face Space (P4 revision): run by deploy-app.yml.
 
-On every merge to main that touches the app, GitHub Actions runs this script:
-  1. stage_space copies exactly what the Space needs into a fresh folder. It also writes
-     the commit into the package (BUILD_COMMIT), so it's baked into the image: /version
-     can then never claim a newer commit than the image actually running.
-  2. The Space is created if needed (Docker, public), and its settings are written: the
-     MLflow registry's address and user as variables, the DagsHub token as a secret.
-  3. The staged folder is uploaded. Hugging Face rebuilds the image and restarts the app.
-  4. wait_until_live polls until the NEW build answers: /version names this commit and
-     /health says it's ready. Building, then loading the models, take several minutes.
-  5. smoke_test sends one passage, written for the purpose, and checks the answer's shape.
+The public demo is a STATIC Space (design §12): one page that runs `lr` inside the visitor's
+browser. On every merge to main that touches the demo, GitHub Actions runs this script:
+  1. it downloads the model files of the MLflow run that app/demo/MODEL_RUN pins (DagsHub);
+  2. stage_space copies exactly what the Space serves into a fresh folder: the page, the
+     engine, the model card, the model files, and version.json (this commit and that run);
+  3. the Space is created if needed (static, public), and the folder is uploaded;
+  4. wait_until_live polls the site until its version.json names this commit;
+  5. smoke_test checks that the site serves exactly the uploaded files, byte for byte (a
+     large file served as a Git LFS pointer, or a stale cached copy, would fail here), then
+     runs the engine on them under Node, on a passage written for the purpose.
 
 Settings come from the environment (GitHub Secrets and Variables): HF_TOKEN, HF_SPACE
-("owner/name"), GITHUB_SHA, MLFLOW_TRACKING_URI, DAGSHUB_USER, DAGSHUB_TOKEN, and optionally
-ENCODER_FOLDS (the design's speed fallback). The tokens go to Hugging Face, never to logs.
+("owner/name"), GITHUB_SHA, and the MLflow server's MLFLOW_TRACKING_URI,
+MLFLOW_TRACKING_USERNAME and MLFLOW_TRACKING_PASSWORD (a DagsHub token, to read the run).
+The tokens never reach the logs or the Space.
 """
 
+import json
+import math
 import os
-import re
 import shutil
 import sys
 import tempfile
@@ -26,18 +28,22 @@ from pathlib import Path
 
 import httpx
 
+from name_that_llm.browser import run_engine
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = (
     "HF_TOKEN",
     "HF_SPACE",
     "GITHUB_SHA",
     "MLFLOW_TRACKING_URI",
-    "DAGSHUB_USER",
-    "DAGSHUB_TOKEN",
+    "MLFLOW_TRACKING_USERNAME",
+    "MLFLOW_TRACKING_PASSWORD",
 )
+PAGE_FILES = ("index.html", "ntl.js", "README.md")  # from app/demo
+MODEL_FILES = ("model.json", "weights.bin")  # from the pinned MLflow run
 
 # Written for this smoke test, in the plain style of a chatbot answer. Never a competition
-# passage: the rules forbid publishing those, and this text travels to a public Space.
+# passage: the rules forbid publishing those.
 SMOKE_TEXT = (
     "Learning a new language as an adult is less about talent than about routine. Short "
     "daily sessions work better than long weekly ones, because memory rewards repetition "
@@ -47,70 +53,71 @@ SMOKE_TEXT = (
 )
 
 
-def stage_space(repo_root: Path, out_dir: Path, commit: str) -> list[Path]:
-    """Copy what the Space needs into `out_dir`; return the staged files (relative paths).
+def pinned_run(repo_root: Path) -> str:
+    """The MLflow run whose model files the demo serves (app/demo/MODEL_RUN)."""
+    return (Path(repo_root) / "app" / "demo" / "MODEL_RUN").read_text(encoding="utf-8").strip()
 
-    Exactly: the Dockerfile and the model card (moved from app/ to where Hugging Face
-    expects them), the project and lock files, and the package source. Never data/,
-    tests or notebooks.
+
+def stage_space(repo_root: Path, model_dir: Path, out_dir: Path, commit: str) -> list[Path]:
+    """Copy what the Space serves into `out_dir`; return the staged files (relative paths).
+
+    Exactly: the page, the engine and the model card from app/demo, the two model files,
+    and version.json, which the page's footer shows and wait_until_live watches for.
+    Nothing else from the repo (above all, never data/) and nothing else from the run.
     """
-    repo_root, out_dir = Path(repo_root), Path(out_dir)
+    demo, out_dir = Path(repo_root) / "app" / "demo", Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(repo_root / "app" / "Dockerfile", out_dir / "Dockerfile")
-    shutil.copy2(repo_root / "app" / "README.md", out_dir / "README.md")
-    for name in ("pyproject.toml", "uv.lock"):
-        shutil.copy2(repo_root / name, out_dir / name)
-    shutil.copytree(
-        repo_root / "src",
-        out_dir / "src",
-        ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "BUILD_COMMIT"),
-        dirs_exist_ok=True,
-    )
-    (out_dir / "src" / "name_that_llm" / "BUILD_COMMIT").write_text(commit)
-    return sorted(p.relative_to(out_dir) for p in out_dir.rglob("*") if p.is_file())
+    for name in PAGE_FILES:
+        shutil.copy2(demo / name, out_dir / name)
+    for name in MODEL_FILES:
+        shutil.copy2(Path(model_dir) / name, out_dir / name)
+    version = {"commit": commit, "model_run": pinned_run(repo_root)}
+    (out_dir / "version.json").write_text(json.dumps(version), encoding="utf-8")
+    return sorted(p.relative_to(out_dir) for p in out_dir.iterdir())
 
 
-def space_host(space_id: str) -> str:
-    """Where Hugging Face serves a Space: "owner/name" -> https://owner-name.hf.space,
-    lowercase, with every run of other characters turned into one dash."""
-    slug = re.sub(r"[^a-z0-9]+", "-", space_id.lower()).strip("-")
-    return f"https://{slug}.hf.space"
+def _get(url: str) -> httpx.Response:
+    """GET, past any cache: the query string is new on every call."""
+    return httpx.get(url, params={"t": time.time()}, follow_redirects=True, timeout=60)
 
 
-def wait_until_live(host: str, commit: str, timeout: float = 1800, every: float = 30) -> dict:
-    """Poll until the build of `commit` is up and its model loaded; return its /version."""
+def wait_until_live(api, space: str, commit: str, timeout: float = 900, every: float = 15) -> str:
+    """Poll until the site serves this commit's version.json; return the site's address."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
+        # Ask Hugging Face where the site is: static Spaces live on *.static.hf.space.
+        host = api.space_info(space).host
         try:
-            version = httpx.get(f"{host}/version", timeout=30).json()
-            health = httpx.get(f"{host}/health", timeout=30)
-            if version.get("commit") == commit:
-                if health.status_code == 200:
-                    print(f"live: {version}")
-                    return version
-                if health.status_code == 500:
-                    sys.exit(f"STOP: the new build failed to load the model: {health.json()}")
-            running = str(version.get("commit"))[:7]
-            print(f"waiting: running commit {running}, health {health.status_code}")
-        except (httpx.HTTPError, ValueError) as exc:  # still building: no answer, or not JSON
-            print(f"waiting: {type(exc).__name__}")
+            live = _get(f"{host}/version.json").json().get("commit") if host else None
+        except (httpx.HTTPError, ValueError):  # not served yet, or not JSON yet
+            live = None
+        if live == commit:
+            print(f"live: {host}")
+            return host
+        print(f"waiting: {host} serves commit {str(live)[:7]}")
         time.sleep(every)
-    sys.exit(f"STOP: the build of {commit[:7]} wasn't live after {timeout / 60:.0f} minutes")
+    sys.exit(f"STOP: {commit[:7]} wasn't live after {timeout / 60:.0f} minutes")
 
 
-def smoke_test(host: str) -> None:
-    """One real prediction: 18 models, sorted, probabilities summing to 1."""
-    response = httpx.post(f"{host}/predict", json={"text": SMOKE_TEXT}, timeout=180)
-    if response.status_code != 200:
-        sys.exit(f"STOP: /predict answered {response.status_code}: {response.text[:300]}")
-    body = response.json()
-    probabilities = [entry["probability"] for entry in body["ranking"]]
-    if len(probabilities) != 18:
-        sys.exit(f"STOP: {len(probabilities)} models in the ranking, not 18")
-    if probabilities != sorted(probabilities, reverse=True) or abs(sum(probabilities) - 1) > 1e-3:
-        sys.exit("STOP: the ranking isn't sorted, or its probabilities don't sum to 1")
-    best = body["ranking"][0]
-    print(f"smoke test: {best['model']} ({best['probability']:.0%}) in {body['seconds']} s")
+def smoke_test(host: str, staged: Path) -> None:
+    """The site serves exactly the uploaded files, and the engine works on them."""
+    for path in sorted(staged.iterdir()):
+        live = _get(f"{host}/{path.name}")
+        if live.status_code != 200 or live.content != path.read_bytes():
+            sys.exit(
+                f"STOP: the site's {path.name} isn't the uploaded file (HTTP "
+                f"{live.status_code}, {len(live.content):,} bytes, not {path.stat().st_size:,})"
+            )
+    # The site's bytes are the staged ones, and the staged ntl.js is the repo's, so the
+    # repo's engine on the staged model files is exactly what visitors run.
+    answer = run_engine("predict", {"model": str(staged), "texts": [SMOKE_TEXT]})
+    probabilities = answer["probabilities"][0]
+    # isclose, not abs(...) > tol: a NaN fails isclose, but passes the other comparison.
+    if len(probabilities) != 18 or not math.isclose(sum(probabilities), 1, abs_tol=1e-6):
+        sys.exit("STOP: the engine didn't give 18 probabilities summing to 1")
+    labels = json.loads((staged / "model.json").read_text(encoding="utf-8"))["labels"]
+    best = max(range(18), key=probabilities.__getitem__)
+    print(f"smoke test: {labels[best]} ({probabilities[best]:.0%}); every file identical")
 
 
 def main() -> None:
@@ -118,30 +125,29 @@ def main() -> None:
     missing = [key for key in REQUIRED if not env.get(key)]
     if missing:
         sys.exit(f"missing settings: {', '.join(missing)} (GitHub Secrets and Variables)")
+    import mlflow
     from huggingface_hub import HfApi
 
     api = HfApi(token=env["HF_TOKEN"])
-    space, commit = env["HF_SPACE"], env["GITHUB_SHA"]
-    api.create_repo(space, repo_type="space", space_sdk="docker", exist_ok=True, private=False)
-    api.add_space_variable(space, "MLFLOW_TRACKING_URI", env["MLFLOW_TRACKING_URI"])
-    api.add_space_variable(space, "MLFLOW_TRACKING_USERNAME", env["DAGSHUB_USER"])
-    api.add_space_secret(space, "MLFLOW_TRACKING_PASSWORD", env["DAGSHUB_TOKEN"])
-    if env.get("ENCODER_FOLDS"):
-        api.add_space_variable(space, "ENCODER_FOLDS", env["ENCODER_FOLDS"])
+    space, commit, run = env["HF_SPACE"], env["GITHUB_SHA"], pinned_run(REPO_ROOT)
     with tempfile.TemporaryDirectory() as tmp:
-        staged = stage_space(REPO_ROOT, Path(tmp), commit)
+        print(f"downloading the model files of run {run}")
+        model_dir = mlflow.artifacts.download_artifacts(run_id=run, dst_path=f"{tmp}/model")
+        staged_dir = Path(tmp) / "space"
+        staged = stage_space(REPO_ROOT, Path(model_dir), staged_dir, commit)
+        api.create_repo(space, repo_type="space", space_sdk="static", exist_ok=True, private=False)
         print(f"uploading {len(staged)} files to the Space {space}")
         api.upload_folder(
             repo_id=space,
-            folder_path=tmp,
+            folder_path=staged_dir,
             repo_type="space",
             commit_message=f"Deploy {commit[:7]}",
-            # Remove source files that no longer exist; the rest are overwritten anyway.
-            delete_patterns=["src/**"],
+            # Delete what earlier deploys uploaded and this one doesn't (Hugging Face
+            # keeps .gitattributes, which says how large files are stored).
+            delete_patterns=["*"],
         )
-    host = space_host(space)
-    wait_until_live(host, commit)
-    smoke_test(host)
+        host = wait_until_live(api, space, commit)
+        smoke_test(host, staged_dir)
 
 
 if __name__ == "__main__":

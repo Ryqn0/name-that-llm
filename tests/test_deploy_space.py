@@ -1,11 +1,13 @@
-"""Tests for the deploy script (P4): what goes to the Hugging Face Space, and where it lives.
+"""Tests for the deploy script (P4 revision): what goes to the public Hugging Face Space.
 
-The upload itself needs a token and the network, so it's checked by the live deploy. What
-can break silently is tested here: the wrong files reaching the Space (above all the
-competition data), and the wrong address for the live checks.
+The upload needs a token and the network, so the live deploy checks it: every live file must
+be byte-identical to the uploaded one, and the engine must work on them under Node. What can
+break silently is tested here: the wrong files reaching the public Space, above all the
+competition data, and the wrong model run named on the page.
 """
 
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -28,45 +30,34 @@ def _touch(path: Path, text: str = "x") -> None:
     path.write_text(text)
 
 
-def test_stage_space_copies_only_the_app_files(deploy, tmp_path):
-    repo = tmp_path / "repo"
-    wanted = [
+def test_stage_space_copies_only_the_demo_files(deploy, tmp_path):
+    repo, model = tmp_path / "repo", tmp_path / "model"
+    for name in ["index.html", "ntl.js", "cli.mjs", "package.json"]:
+        _touch(repo / "app" / "demo" / name)
+    _touch(repo / "app" / "demo" / "README.md", "the demo's model card")
+    _touch(repo / "app" / "demo" / "MODEL_RUN", "run123\r\n")  # as Python writes it on Windows
+    for name in [
+        "data/raw/train.csv",
         "app/Dockerfile",
         "app/README.md",
-        "pyproject.toml",
-        "uv.lock",
-        "src/name_that_llm/__init__.py",
-        "src/name_that_llm/static/index.html",
-    ]
-    unwanted = [
-        "data/raw/train.csv",
-        "tests/test_x.py",
-        "notebooks/n/n.ipynb",
         "README.md",
-        "src/name_that_llm/__pycache__/x.cpython-313.pyc",
-        ".git/config",
-    ]
-    for name in wanted + unwanted:
+        "src/name_that_llm/__init__.py",
+        "tests/test_x.py",
+    ]:
         _touch(repo / name)
-    _touch(repo / "app/README.md", "the model card")  # unlike the project's own README.md
+    for name in ["model.json", "weights.bin", "anything-else.txt"]:  # the run's download
+        _touch(model / name)
 
-    staged = deploy.stage_space(repo, tmp_path / "space", commit="abc1234")
+    staged = deploy.stage_space(repo, model, tmp_path / "space", commit="abc1234")
 
     assert sorted(p.as_posix() for p in staged) == [
-        "Dockerfile",  # app/Dockerfile, moved to where Hugging Face expects it
-        "README.md",  # app/README.md: the model card, not the project README
-        "pyproject.toml",
-        "src/name_that_llm/BUILD_COMMIT",
-        "src/name_that_llm/__init__.py",
-        "src/name_that_llm/static/index.html",
-        "uv.lock",
+        "README.md",  # app/demo/README.md: the Space's model card
+        "index.html",
+        "model.json",
+        "ntl.js",
+        "version.json",
+        "weights.bin",
     ]
-    assert (tmp_path / "space" / "src/name_that_llm/BUILD_COMMIT").read_text() == "abc1234"
-    assert (tmp_path / "space" / "README.md").read_text() == "the model card"
-
-
-def test_space_host_follows_hf_rules(deploy):
-    # A Space "owner/name" is served at https://owner-name.hf.space: lowercase, and any
-    # character other than a letter or a digit becomes a dash.
-    assert deploy.space_host("Ryqn0/name-that-llm") == "https://ryqn0-name-that-llm.hf.space"
-    assert deploy.space_host("a_b/c.d") == "https://a-b-c-d.hf.space"
+    assert (tmp_path / "space" / "README.md").read_text() == "the demo's model card"
+    version = json.loads((tmp_path / "space" / "version.json").read_text())
+    assert version == {"commit": "abc1234", "model_run": "run123"}
