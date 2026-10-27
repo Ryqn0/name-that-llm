@@ -4,16 +4,8 @@
 name: deploy-app
 
 on:
-  push:
-    branches: [main]
-    # Only changes that alter the app trigger a deploy. Docs, notebooks and tests don't.
-    paths:
-      - "app/**"
-      - "src/**"
-      - "pyproject.toml"
-      - "uv.lock"
-      - "scripts/deploy_space.py"
-      - ".github/workflows/deploy-app.yml"
+  # Manual only for now: Docker Spaces need Hugging Face PRO, so a merge would fail (402).
+  # The push trigger returns with the static demo's deploy (P4 Task 8c, design §12).
   workflow_dispatch:  # a manual "deploy now" button, in GitHub's Actions tab
 
 # Two deploys at once would race to upload: the second one waits for the first.

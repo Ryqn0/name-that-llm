@@ -249,3 +249,42 @@ Claude will guide each step.
 9. **Back the "How sure?" wording with data,** not with fixed thresholds.
 10. **Keep the 20 to 1,000 word limit,** with a note that the app works best on 50 to 300
     words.
+
+## 12. Revision (2026-10-26): the public demo runs in the browser
+
+**What changed.** The first deploy found that Hugging Face no longer hosts Docker Spaces for
+free:
+
+> Static Spaces are free for everyone, but hosting Gradio and Docker Spaces on free
+> cpu-basic requires a PRO subscription.
+
+The design's "free Hugging Face Space (CPU basic)" no longer exists. The user chose the
+**lighter free demo** from the options (Hugging Face PRO at about $9 a month; local only for
+now; a free Oracle Cloud VM; a lighter free demo).
+
+**The public demo, as revised:**
+- A **static Space** (free): one page that runs **only the TF-IDF model (`lr`)**, inside the
+  visitor's browser. That model scored public LB 0.320 (CV 0.325) and names the exact model
+  about 3 times in 10, against 0.410 for the full champion.
+- The page keeps layout B, the "How sure?" line and the warning box. The numbers change to
+  `lr`'s, and the warning adds that this demo runs the lighter model, while the full champion
+  is in the repo. Privacy improves: **the text never leaves the visitor's browser.**
+- **Exact parity with scikit-learn.** `flatten_text`, the TF-IDF vectorizers (word 1-2-grams,
+  lowercased; character 1-5-grams; sublinear term frequency, idf, l2 norm) and the logistic
+  regression's softmax are ported to JavaScript. Tests run the port with Node and compare it
+  with Python on the same inputs (flattening identical; probabilities within 1e-5).
+- **The model files** are `lr` exported from the registered champion (version 1), with
+  `lr`'s own "How sure?" bands, measured on its out-of-fold predictions: about 1 MB of
+  vocabulary and 13 MB of float32 weights. They're logged as an MLflow run on DagsHub. The
+  repo pins the run id, so the deployed model changes only through a pull request.
+- **CD** (`deploy-app.yml`, on merge): download the pinned run's files, stage the page, the
+  engine and the model card, create or update the static Space, wait for the new version, then
+  smoke-test by running the deployed engine and files under Node.
+
+**The full champion stays.** The FastAPI app, the registry, the Docker image and its CI build
+(§5) remain the way to run the full champion, locally. Hosting it publicly (Hugging Face PRO,
+or a free VM) is a decision for later, for example with the final model in P9.
+
+**Anti-goals still hold:** no competition passage anywhere, and no stored text. The exported
+vocabulary holds word and character n-grams, which are model parameters, not passages: a
+public app with a model trained on this data is allowed (§3 of the project design).
