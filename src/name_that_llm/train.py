@@ -26,6 +26,7 @@ from name_that_llm.cv import make_folds
 from name_that_llm.data import LABELS, load_train
 from name_that_llm.metrics import score
 from name_that_llm.models import build_dense_model, build_model
+from name_that_llm.pool import pool_for_fold
 
 
 @dataclass
@@ -37,18 +38,30 @@ class CVResult:
     score: float  # balanced accuracy over all OOF predictions
 
 
-def _oof(make_model: Callable[[], Pipeline], X: np.ndarray, y: np.ndarray, folds: np.ndarray):
+def _oof(
+    make_model: Callable[[], Pipeline],
+    X: np.ndarray,
+    y: np.ndarray,
+    folds: np.ndarray,
+    extra_for_fold: Callable[[int], tuple[np.ndarray, np.ndarray]] | None = None,
+):
     """The fold loop shared by run_cv (texts) and run_cv_features (dense features).
 
-    Returns (n_rows, 18) out-of-fold probabilities, columns in LABELS order.
+    `extra_for_fold(k)` optionally returns more (X, y) rows to TRAIN fold k's model on
+    (the pool, P7); they're never predicted. Returns (n_rows, 18) out-of-fold
+    probabilities, columns in LABELS order.
     """
     oof = np.zeros((len(y), len(LABELS)))
     for k in np.unique(folds):
         train_rows, valid_rows = folds != k, folds == k
+        X_fit, y_fit = X[train_rows], y[train_rows]
+        if extra_for_fold is not None:
+            X_extra, y_extra = extra_for_fold(int(k))
+            X_fit, y_fit = np.concatenate([X_fit, X_extra]), np.concatenate([y_fit, y_extra])
         # A FRESH, untrained model per fold: everything it learns (the vectorizer's
         # vocabulary, the scaler's means, the weights) comes from the training prompts
         # only, so nothing leaks in from the held-out prompts.
-        model = make_model().fit(X[train_rows], y[train_rows])
+        model = make_model().fit(X_fit, y_fit)
         # Review Focus 3: never assume the model saw all 18 labels. If a fold's training
         # data lacked one, `classes_` has only 17 entries, and writing the probabilities
         # into columns 0..16 would silently shift every column after the gap. Mapping
@@ -70,6 +83,37 @@ def run_cv(cfg: ExperimentConfig, df: pd.DataFrame) -> CVResult:
     y = df["model"].to_numpy()
     folds = make_folds(df, cfg.n_splits, cfg.seed).to_numpy()
     return _result(_oof(lambda: build_model(cfg), df["text"].to_numpy(), y, folds), y, folds)
+
+
+def run_cv_pool(
+    cfg: ExperimentConfig,
+    df: pd.DataFrame,
+    pool: pd.DataFrame | None = None,
+    max_pool: int | None = None,
+) -> CVResult:
+    """run_cv, where each fold ALSO trains on the pool rows it may use (P7 Task 3).
+
+    Fold k adds pool_for_fold(pool, its validation prompts, max_pool, seed=cfg.seed + k):
+    never a pool passage about one of its own validation prompts. Only our passages are
+    predicted and scored, so the score stays comparable with run_cv's. Without a pool,
+    this IS run_cv.
+    """
+    y = df["model"].to_numpy()
+    folds = make_folds(df, cfg.n_splits, cfg.seed).to_numpy()
+    prompts = df["prompt_id"].to_numpy()
+
+    def extra_for_fold(k: int) -> tuple[np.ndarray, np.ndarray]:
+        rows = pool_for_fold(pool, set(prompts[folds == k]), max_pool, seed=cfg.seed + k)
+        return rows["text"].to_numpy(), rows["model"].to_numpy()
+
+    oof = _oof(
+        lambda: build_model(cfg),
+        df["text"].to_numpy(),
+        y,
+        folds,
+        extra_for_fold if pool is not None else None,
+    )
+    return _result(oof, y, folds)
 
 
 def run_cv_features(

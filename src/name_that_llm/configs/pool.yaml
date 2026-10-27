@@ -5,6 +5,14 @@
 # open-licensed candidate we inspected (29+ datasets, each row credited to its original
 # dataset in `source_dataset`), and it excludes the ones with an unknown or "other" license.
 # Version used: ntl_open_pool.parquet, 246,978 rows, 128,431,676 bytes, downloaded 2026-10-27.
+#
+# P7 Task 3 (2026-10-27, scripts/pool_check.py): each original dataset was added alone to
+# `lr`'s training on our seed-42 folds. Only the 5 below raised the score. Together (48,083
+# passages, capped at 30,000) they lift `lr` from 0.3212 to 0.4205 (bootstrap 95% CI
+# [+0.080, +0.120]). The other 51 lowered it, but most cover only a few of the 18 models,
+# which pulls an unweighted `lr` toward those models: they hurt as used there, which doesn't
+# prove their labels wrong (I-028). `include` is an allowlist: a dataset added in a later
+# version of the pool stays out until it's checked.
 sources:
 - slug: crtproduction/name-that-llm-open-pool
   files: "*.parquet"
@@ -12,3 +20,9 @@ sources:
   model: model
   source_column: source_dataset
   keep: true
+  include:
+  - drjcfmd/ntl-generated-v2
+  - darragh1walsh/ntl-kaggle-ai-gen-run-1
+  - ayhampar/ntl-pool-ft
+  - vbandaru/ntl-extra-passages-w05
+  - prvsiyan/prvsiyans-extended-name-that-llm-dataset

@@ -54,6 +54,10 @@ class PoolSource(BaseModel):
     # quality checks then judge the original datasets (P7 Task 3). None: the slug.
     source_column: str | None = None
     keep: bool = True  # False once a quality check shows the source hurts
+    # The original datasets (values of source_column) to keep, from P7 Task 3's check;
+    # None keeps them all. An allowlist, so a dataset added in a later version of the pool
+    # stays out until it's checked (P6's weekly retraining downloads the latest version).
+    include: list[str] | None = None
 
 
 def load_pool_sources(name: str = "pool") -> list[PoolSource]:
@@ -221,7 +225,7 @@ def _read(path: Path, columns: list[str]) -> pd.DataFrame:
 
 def build_pool(sources: Sequence[PoolSource], root: Path, train: pd.DataFrame) -> pd.DataFrame:
     """The training pool: (text, model, source, prompt_id), cleaned, deduped and matched."""
-    root, frames = Path(root), []
+    root, frames, kept = Path(root), [], set()
     for source in sources:
         if not source.keep:
             continue
@@ -236,9 +240,16 @@ def build_pool(sources: Sequence[PoolSource], root: Path, train: pd.DataFrame) -
         if source.source_column:
             for name, part in raw.groupby(source.source_column, sort=True):
                 frames.append(clean_pool(part, str(name)))
+                if source.include is None or str(name) in source.include:
+                    kept.add(str(name))
         else:
             frames.append(clean_pool(raw, source.slug))
+            kept.add(source.slug)
+    # Copies and label conflicts are judged across EVERY source, before the allowlist: a
+    # text two sources label differently has a wrong label somewhere, even when one of the
+    # two isn't kept. (It's also exactly the pool P7 Task 3's check measured.)
     pool = dedupe(pd.concat(frames, ignore_index=True), train["text"])
+    pool = pool[pool["source"].isin(kept)].reset_index(drop=True)
     threshold = calibrate_match_threshold(train["text"], train["prompt_id"])
     pool["prompt_id"] = match_prompts(pool["text"], train["text"], train["prompt_id"], threshold)
     return pool[["text", "model", "source", "prompt_id"]]
