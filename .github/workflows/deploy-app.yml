@@ -1,11 +1,15 @@
-# Continuous Deployment of the live app (P4): every merge to main that touches the app
-# redeploys the Hugging Face Space, then checks the live result (scripts/deploy_space.py):
-# the new build must answer /health, report this commit on /version, and pass one /predict.
+# Continuous Deployment of the free demo (P4 revision, design §12): every merge to main that
+# touches the demo redeploys its static Hugging Face Space, then checks the live site
+# (scripts/deploy_space.py): it must serve exactly the uploaded files, and they must work.
 name: deploy-app
 
 on:
-  # Manual only for now: Docker Spaces need Hugging Face PRO, so a merge would fail (402).
-  # The push trigger returns with the static demo's deploy (P4 Task 8c, design §12).
+  push:
+    branches: [main]
+    paths:
+      - "app/demo/**"  # the page, the engine, the model card, and MODEL_RUN (the model)
+      - "scripts/deploy_space.py"
+      - ".github/workflows/deploy-app.yml"
   workflow_dispatch:  # a manual "deploy now" button, in GitHub's Actions tab
 
 # Two deploys at once would race to upload: the second one waits for the first.
@@ -19,22 +23,22 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Building the image and loading the models take several minutes; the script itself
-    # gives up after 30.
-    timeout-minutes: 45
+    # Downloading the model, uploading it and waiting for the site take a few minutes; the
+    # script itself gives up after 15.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.13"
       - run: uv sync --locked --extra serve
+      # The smoke test runs the engine with Node, which GitHub's Ubuntu machines come with.
       - run: uv run python scripts/deploy_space.py
         env:
-          # Secrets: stored encrypted in GitHub, masked in logs, passed on to Hugging Face.
+          # Secrets: stored encrypted in GitHub, masked in logs.
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
           # Variables: not secret, but kept out of the code so they can change without a PR.
           HF_SPACE: ${{ vars.HF_SPACE }}
-          DAGSHUB_USER: ${{ vars.DAGSHUB_USER }}
           MLFLOW_TRACKING_URI: ${{ vars.MLFLOW_TRACKING_URI }}
-          ENCODER_FOLDS: ${{ vars.ENCODER_FOLDS }}
+          MLFLOW_TRACKING_USERNAME: ${{ vars.DAGSHUB_USER }}

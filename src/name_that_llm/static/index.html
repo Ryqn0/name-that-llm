@@ -39,6 +39,14 @@
   .pill { display: inline-block; padding: 3px 12px; border-radius: 12px; background: var(--track); }
   .bars { display: grid; grid-template-columns: minmax(110px, auto) 82px 1fr 44px; gap: 6px 10px;
           align-items: center; margin-top: 12px; }
+  /* One grid for all 18 rows, so every bar starts at the same place. Collapsed, only the
+     top 5 show: a row is 4 cells, so the 6th row starts at cell 21. */
+  .bars.collapsed > :nth-child(n+21) { display: none; }
+  /* Phones: the company column goes (the best guess still names it), so the bars keep room. */
+  @media (max-width: 480px) {
+    .bars { grid-template-columns: auto 1fr 40px; }
+    .bars .lab { display: none; }
+  }
   .track { background: var(--track); border-radius: 4px; height: 10px; }
   .fill { background: var(--accent); border-radius: 4px; height: 10px; }
   .right { text-align: right; font-variant-numeric: tabular-nums; }
@@ -69,8 +77,7 @@
     <div class="muted">Most likely</div>
     <div class="best" id="best"></div>
     <span class="pill" id="sure"></span>
-    <div class="bars" id="top"></div>
-    <div class="bars" id="rest" hidden></div>
+    <div class="bars collapsed" id="bars"></div>
     <div class="row"><button class="link" id="toggle">Show all 18 ▾</button></div>
   </section>
 
@@ -101,7 +108,7 @@
   function addRow(grid, entry) {
     const pct = (100 * entry.probability).toFixed(0) + "%";
     const name = document.createElement("span"); name.textContent = entry.model;
-    const lab = document.createElement("span"); lab.className = "muted"; lab.textContent = entry.lab;
+    const lab = document.createElement("span"); lab.className = "muted lab"; lab.textContent = entry.lab;
     const track = document.createElement("div"); track.className = "track";
     const fill = document.createElement("div"); fill.className = "fill";
     fill.style.width = (100 * entry.probability).toFixed(1) + "%";
@@ -118,10 +125,9 @@
     $("best").appendChild(by);
     $("sure").textContent = "How sure? " + body.confidence.label + ": at this level, the best guess is right about "
       + body.confidence.right_in_10 + " times in 10.";
-    $("top").replaceChildren(); $("rest").replaceChildren();
-    body.ranking.slice(0, 5).forEach((e) => addRow($("top"), e));
-    body.ranking.slice(5).forEach((e) => addRow($("rest"), e));
-    $("rest").hidden = true; $("toggle").textContent = "Show all 18 ▾";
+    $("bars").replaceChildren();
+    body.ranking.forEach((e) => addRow($("bars"), e));
+    $("bars").classList.add("collapsed"); $("toggle").textContent = "Show all 18 ▾";
     $("result").hidden = false;
   }
 
@@ -147,8 +153,8 @@
 
   $("identify").addEventListener("click", identify);
   $("toggle").addEventListener("click", () => {
-    $("rest").hidden = !$("rest").hidden;
-    $("toggle").textContent = $("rest").hidden ? "Show all 18 ▾" : "Show the top 5 ▴";
+    const collapsed = $("bars").classList.toggle("collapsed");
+    $("toggle").textContent = collapsed ? "Show all 18 ▾" : "Show the top 5 ▴";
   });
 
   // The footer says exactly which model answers, and links the model card on the Space.
