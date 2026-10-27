@@ -2,6 +2,47 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-10-27 · Session 8: P7 begins with generated data, and P6 is planned
+
+**Did**
+- **Planned two phases**, both approved:
+  - P7: an LLM classifier and generated training data, the score lever;
+  - P6: watching the public site and the models over time.
+- **Studied the leaders' public 0.651 notebooks** (your 10 links). Their recipe is LoRA'd
+  8–14B LLMs, about 250k generated passages, and Sinkhorn balancing. We use none of their
+  code or weights.
+- **P7 Tasks 1–4:**
+  - **Sinkhorn class balancing:** measured, and dropped (I-027).
+  - **The pool:** 246,945 public, open-licensed generated passages, cleaned and
+    deduplicated against ours. Each is matched to our prompts by topic, so no fold ever
+    trains on its own topics.
+  - **The pool check** on our folds (below).
+  - **`llm.py`:** Qwen 3 with LoRA on 4-bit weights, two folds at once on Kaggle's two
+    GPUs, tested on CPU with a tiny random Qwen.
+- **Pushed three placeholder notebooks to Kaggle**, so the W&B secret can be attached to
+  them.
+
+**Learned**
+- **More data is the biggest lever yet.** 30,000 pool passages lift `lr` alone from 0.321
+  to 0.421 on CV, as high as the whole three-model ensemble.
+- **A per-source check on an unweighted model mixes quality up with balance.** 51 of 56
+  sources "hurt" when added alone, but most cover only a few of the 18 models, which pulls
+  an unweighted `lr` toward them. We kept the 5 that helped.
+- **For data that's re-downloaded, an allowlist beats a blocklist:** a new, unchecked
+  source stays out by default.
+
+**Scores**
+
+| model | CV (seed 42) | LB |
+|---|---|---|
+| `lr` + 30,000 pool passages | 0.4205 | — |
+| champion `ensemble` | 0.4219 | 0.410 |
+| `lr` alone | 0.3212 | 0.320 |
+
+**Next**
+- You: attach `WANDB_API_KEY` to the three new notebooks on Kaggle.
+- P7 Task 5, the first Qwen3-8B GPU run; P6 Task 1 during its wait.
+
 ## 2026-10-26 → 27 · Session 7: the app, the registry, and a free demo in the browser (P4)
 
 **Did**

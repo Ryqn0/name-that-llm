@@ -36,10 +36,24 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 ## Status
 
-- Phase: **P4 done** (2026-10-27): App v1 and CD
-  ([plan](docs/superpowers/plans/2026-10-26-p4-app.md),
-  [journal](docs/journal/p4-app.md)). **Next:** the user picks P6 (the MLOps loop) or P7
-  (LLM and ensemble).
+- Phase: **P7 in progress** (LLM and ensemble:
+  [design](docs/superpowers/specs/2026-10-27-p7-llm-ensemble-design.md),
+  [plan](docs/superpowers/plans/2026-10-27-p7-llm-ensemble.md)). Tasks 1–4 of 9 were done
+  on 2026-10-27. **P6** (the MLOps loop: watching the site and the models) is designed and
+  planned ([design](docs/superpowers/specs/2026-10-27-p6-mlops-loop-design.md),
+  [plan](docs/superpowers/plans/2026-10-27-p6-mlops-loop.md)); its tasks run on CPU during
+  P7's GPU waits. **P4** (App v1 and CD) was done on 2026-10-27
+  ([plan](docs/superpowers/plans/2026-10-26-p4-app.md), [journal](docs/journal/p4-app.md)).
+  - **P7 so far:**
+    - Sinkhorn balancing was dropped: its 95% CI includes 0 (I-027).
+    - The pool of public generated passages is built, with its safeguards. With 30,000 of
+      its passages, `lr` alone goes from CV 0.3212 to **0.4205** (+0.099, 95% CI [+0.080,
+      +0.120]), as high as the whole champion ensemble's CV.
+    - Only 5 of the pool's 56 sources are kept, as an allowlist in `configs/pool.yaml`.
+      The other 51 lowered `lr` when added alone, but mostly through class imbalance
+      (I-028).
+    - `llm.py` is built and tested on CPU: LoRA on 4-bit Qwen, with two folds at once on
+      Kaggle's two T4s.
   - **The free public demo is live:** <https://huggingface.co/spaces/Ryqn/name-that-llm>.
     It's a static Space: the page runs `lr` in the visitor's browser (`app/demo/ntl.js`,
     parity-tested against scikit-learn), so the text never leaves the device. Its model is
@@ -209,24 +223,27 @@ CV = the seed-42 folds, the same for every row.
 
 ## Next steps
 
-State on 2026-10-27: **P4 is done**
-([journal](docs/journal/p4-app.md)). The free demo is live, and the champion (LB 0.410)
-is registered and runs locally.
+State at the end of session 8 (2026-10-27): **P7 Tasks 1–4 are done.** The three P7
+notebooks exist on Kaggle as placeholders, pushed so the W&B secret can be attached:
+llm-first and llm-explore are public, and llm-final stays private until 2027-01-13.
 
-1. **Choose the next phase:**
-   - **P7, LLM and ensemble:** the score lever. The top-10% cutoff is 0.641, against our
-     0.410.
-   - **P6, the MLOps loop:** monitoring, online A/B, continuous training. Its monitoring
-     was designed around a hosted server, but the public demo now runs in the browser and
-     has none. So P6 needs a rethink first: monitor the full app locally, or host it
-     (I-026). I-024 and I-025 belong there.
-2. **Fix W&B in the GPU notebooks:** every pushed P5 run printed "W&B tracking is OFF
-   (ConnectionError)", so P5 has no W&B runs. Most likely the Kaggle Secret
-   `WANDB_API_KEY` must be attached to each notebook once, in the Kaggle editor
-   (Add-ons → Secrets).
-3. Cheap follow-ups: I-015 (calibrated or log blend, in P7's M6 ensemble), I-017 (TF
-   without IDF), I-018 (the weight grid inside each Optuna trial), I-020 and I-022 (encoder
-   tuning: more epochs, and the noise floor).
-4. **Optional:** tag `v0.8.0` (`pyproject.toml` already says 0.8.0). It would publish the
-   Kaggle lib dataset, which needs the user's OK, but the offline notebook needs nothing
-   from P4.
+1. **The user, on kaggle.com:** attach the Kaggle Secret `WANDB_API_KEY` to each of
+   [llm-first](https://www.kaggle.com/code/ryqn00/name-that-llm-llm-first),
+   [llm-explore](https://www.kaggle.com/code/ryqn00/name-that-llm-llm-explore) and
+   [llm-final](https://www.kaggle.com/code/ryqn00/name-that-llm-llm-final): open it, then
+   Edit → Add-ons → Secrets. That's the W&B fix for every P7 GPU run (no P5 run logged to
+   W&B for lack of it).
+2. **P7 Task 5:**
+   - write `notebooks/10-llm-first`, the first Qwen3-8B run (pool-free, seed 7);
+   - smoke-test it locally;
+   - push it: at most 8 GPU-hours, and it needs the user's OK in that session.
+
+   The step-by-step ledger: `.superpowers/sdd/2026-10-27-p7-llm-ensemble/progress.md`.
+3. **P6 Task 1** (`app/demo/telemetry.js`), during that GPU run. Its Step 1 (the Grafana
+   collector's format) is done. Ledger: `.superpowers/sdd/2026-10-27-p6-mlops-loop/progress.md`.
+4. Cheap follow-ups:
+   - I-015: a calibrated or log blend, in P7 Task 7;
+   - I-017: TF without IDF;
+   - I-018: the weight grid inside each Optuna trial;
+   - I-020 and I-022: encoder tuning (more epochs, and the noise floor);
+   - I-028: a fairer check of the pool's other 51 sources, only if the pool runs short.
