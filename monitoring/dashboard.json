@@ -18,6 +18,7 @@
         "label": "Logs",
         "type": "datasource",
         "query": "loki",
+        "regex": "/-logs$/",
         "hide": 0
       },
       {

@@ -96,3 +96,17 @@ def test_both_alerts_are_active():
     # The robot alert started paused (no robot yet). Its events reach Loki now
     # (2026-10-28), so a silent robot must alert.
     assert [rule["isPaused"] for rule in ALERTS] == [False, False]
+
+
+def test_the_dashboard_opens_on_the_logs_data_source():
+    # A Grafana Cloud stack has several Loki data sources (logs, alert state history, usage
+    # insights). Without a filter, the picker took the first one alphabetically, the alert
+    # history, and every panel came up empty (seen on 2026-10-28).
+    (variable,) = [v for v in DASHBOARD["templating"]["list"] if v["name"] == "datasource"]
+    pattern = re.compile(variable["regex"].strip("/"))
+    names = [
+        "grafanacloud-s-alert-state-history",
+        "grafanacloud-s-logs",
+        "grafanacloud-s-usage-insights",
+    ]
+    assert [n for n in names if pattern.search(n)] == ["grafanacloud-s-logs"]
