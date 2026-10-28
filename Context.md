@@ -43,7 +43,8 @@ outputs are a public repo, a progress diary, and a live demo app.
 - **P6** (the MLOps loop) was done on 2026-10-28:
   [plan](docs/superpowers/plans/2026-10-27-p6-mlops-loop.md),
   [journal](docs/journal/p6-mlops-loop.md),
-  [ADR 0007](docs/adr/0007-watching-a-static-site.md).
+  [ADR 0007](docs/adr/0007-watching-a-static-site.md). The final review's fixes shipped in
+  #60.
 - **P4** (App v1 and CD) was done on 2026-10-27
   ([plan](docs/superpowers/plans/2026-10-26-p4-app.md), [journal](docs/journal/p4-app.md)).
   - **Monitoring (P6):**
@@ -177,6 +178,11 @@ CV = the seed-42 folds, the same for every row.
     two sets of numbers: the offline gate's, from the challenger's MLflow run, and the live
     ones, from the dashboard and the `live-feedback` export. Update `app/demo/README.md`'s
     numbers by hand.
+    - **Before promoting, re-measure the unusual-text limits with the challenger's own
+      recipe** (P6's final review). `browser.unusual_thresholds` fits each fold's
+      vocabulary on our passages only. For `lr` + the pool, add the pool to each fold's
+      training rows. A larger vocabulary knows more words, so the unknown-word limit
+      changes.
 - **Monitoring as code:** edit `monitoring/dashboard.json` or `monitoring/alerts.json`, then
   run `python -X utf8 scripts/push_monitoring.py` with `C:\Users\dungr\.grafana.env` loaded.
   Every push to Grafana needs the user's OK.
@@ -289,7 +295,10 @@ live. **P7 Tasks 1–5 are done, and Task 6 is running on Kaggle**: notebook 11,
    - look at the dashboard;
    - answer "Do you know who wrote it?" on texts whose author you know;
    - weekly: the retraining may open a challenger PR, which is a person's decision.
-5. Cheap follow-ups:
+5. **Suggested, your setting:** branch protection on main (pull requests only, CI
+   required). The retraining's token can write to the repo, and protection keeps main
+   reachable through reviewed, tested pull requests only.
+6. Cheap follow-ups:
    - I-015: a calibrated or log blend, in P7 Task 7;
    - I-017: TF without IDF;
    - I-018: the weight grid inside each Optuna trial;

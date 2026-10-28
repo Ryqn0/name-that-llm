@@ -15,6 +15,11 @@ Newest entry first. Each entry follows the same format: **Did / Learned / Scores
     challenger, and with your OK it now scores visitors' texts in shadow mode.
 - **You set up Grafana Cloud** (stack, collector, tokens, email, Infinity), guided step by
   step. Then you visited the demo, and your visit showed on the dashboard.
+- **P6's final review** by a fresh reviewer: nothing critical, 6 important findings. All
+  were fixed in #60, each with a test that failed first:
+  - the retraining won't re-propose an equally good model every week;
+  - the challenger can't slow or break the visitor's answer;
+  - the live panels compare the two models on the same texts.
 - **P7 Task 5:** the first Qwen3-8B run on Kaggle's two T4s. The first try ran out of
   memory, which was fixed, and the second ran for 4 hours.
 - **P7 Task 6 started:** notebook 11 explores depth, length and the pool for the LLM.
@@ -31,6 +36,8 @@ Newest entry first. Each entry follows the same format: **Did / Learned / Scores
   in a process of its own returns its memory for sure.
 - **A first scheduled run is a test of its own.** Both weekly jobs failed their first GitHub
   run, for reasons a local run couldn't show.
+- **Look at the rendered panel.** Thirteen tests passed and Loki accepted every query, yet
+  two panels showed unnamed numbers. Rendering them as images showed it at once.
 
 **Scores** (seed-7 out-of-fold, balanced accuracy)
 

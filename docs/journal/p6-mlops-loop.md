@@ -20,7 +20,10 @@ turn the site into a live test set.
 **In numbers:**
 - 10 pull requests (#48 to #57): 32 files, 2,787 lines added and 59 removed in
   `3b8becd..4c75a3e`, 580 of the added lines in tests.
-- The full suite grew from 158 to 180 tests.
+- Then #58, the first challenger the retraining proposed, and #60, the final review's fix
+  pass: 14 files, 588 lines added and 97 removed, with 16 new tests.
+- The full suite grew from 158 to 180 tests by #57. When #60 merged, it stood at 210,
+  P7's tests included.
 - The live chain was proved end to end. The robot's visit reached Loki through the
   collector. The user's own visit followed: page load, answer, and "It was actually…
   qwen3.8-max".
@@ -285,9 +288,14 @@ From the ledger, in order, each with its cost if wrong:
 
 ## Open issues
 
-- **The retraining's second run** (after #56) was still running when this was written.
-  Expected: a pull request proposing `lr` plus the pool (CV 0.4205) as the demo's
-  challenger. Merging it is the user's decision.
+- **The retraining's second run** (after #56) proposed `lr` plus the pool as the demo's
+  challenger: CV 0.4186 on the runner, where the local dry run gave 0.4205. The user merged
+  it (#58), and shadow mode is live.
+- **GitHub switches off scheduled workflows** in a public repo after 60 days without
+  activity. After the competition, the robot will stop, and its silence alert will email
+  every repeat interval. ADR 0007 says what to do.
+- **Branch protection on main** (pull requests only, CI required) is suggested: the
+  retraining's token can write to the repo. It's the user's setting to switch on.
 - **Grafana Cloud's trial** turns into the free tier on its own after 14 days. Logs are
   kept about two weeks, which is why the weekly export exists.
 - **The collector's address is public**, so anyone could send fake events. Browsers are
@@ -296,7 +304,93 @@ From the ledger, in order, each with its cost if wrong:
 
 ## The final review
 
-(Written after the fresh reviewer's report.)
+- **The reviewer:** the user chose a fresh reviewer agent. It read the whole branch
+  (`3b8becd..4c75a3e`, #48 to #57) against the plan and the design.
+- **Its verdict:** "with fixes". Nothing was Critical, 6 findings were Important, and 10
+  were Minor (A to J). In its words: "The privacy and robustness promises hold, and nothing
+  is Critical."
+- **Facts checked before the triage:**
+  - the live challenger's download is 35.1 MB (4.7 + 30.4), and the champion's 15.3 MB;
+  - the collector adds `page_id`, and `browser_mobile` (read from the User-Agent), to each
+    stored event. It stores no IP address, location or browser name.
+- **The triage** graded each finding by what a person using the site would get. All six
+  Important findings were fixed. Two Minor ones were upgraded:
+  - **B**, because the model card promises that a message quoting the text is redacted;
+  - **C**, because anyone can send events to the public collector, and one junk value
+    crashed the weekly export.
+
+**The fixes**, in one pull request (#60). Each has a test that failed first.
+
+| # | The finding | The fix | Its test |
+|---|---|---|---|
+| 1 | The retraining would open the same proposal every week: the candidate only had to be no worse than the challenger | A margin of 0.005 over both pinned models' logged CVs | `test_propose_needs_a_margin_over_every_pinned_model` |
+| 2 | The write token stayed in the checkout for every step, and `kaggle` wasn't pinned | The checkout keeps no credentials; the token is set up only in the pull-request step (`gh auth setup-git`); `kaggle==2.2.5` | `test_the_retraining_workflow_keeps_its_write_token_in_one_step`, `test_the_pull_request_step_sets_up_git_credentials_before_pushing` |
+| 3 | The live panels counted answers no model can get right ("a person", "another model"), and compared champion and challenger on different texts | Only answers naming one of the 18; per model run, with n beside; champion vs challenger on the same texts, as counts | `test_live_accuracy_counts_only_answers_naming_a_model`, `test_live_numbers_are_per_run_on_the_same_texts_and_show_n`, `test_a_model_with_no_right_answer_shows_zero` |
+| 4 | The bar charts needed an x field the queries didn't give, so they didn't draw | Bar gauges, one bar per series | `test_no_panel_depends_on_an_x_field` |
+| 5 | The export's week ended "now": a late, repeated or missed run left gaps or overlaps | Fixed Monday-to-Monday weeks (UTC), and `--end` to redo a missed week | `test_export_weeks_are_fixed_monday_windows` |
+| 6 | The challenger was scored before the answer was painted, inside the champion's `try` | After paint, in its own `try`, with its own time; skipped when the browser asks to save data or on 2g; once loaded, it scores the text on screen | `test_answer_events_carry_the_challengers_own_time`, and the page check |
+| B | Redaction missed the same letters in another Unicode form | NFKC normalization on both sides | `test_redaction_sees_through_unicode_forms` |
+| C | One junk event could sink the export, or blank a panel | A logfmt parser instead of shlex; missing fields count as zero; safe metric names; `__error__=""` after `unwrap` | `test_parse_loki_survives_junk_values`, `test_a_window_without_the_synthetic_field_gives_zeros`, `test_metric_names_are_safe_whatever_the_run_id`, `test_unwrapped_values_drop_parse_errors` |
+| H | The page check never ran a second answer | It does, and checks the challenger's label and time | `scripts/check_demo_page.py` |
+
+**The render check** came after the fixed dashboard was pushed (with the user's OK). Three
+panels were rendered as images through Grafana's render API:
+- the stat panel read "Value #A 0.00", and each bar gauge showed one bar with no name;
+- **the causes:** a Loki instant query reaches a stat panel as one table, which it reduces
+  to a single unnamed number; and Grafana hides the name of a panel's only value, which is
+  common on a quiet demo;
+- **the fix:** range queries reduced to their last point, and display-name templates. Two
+  tests failed against the committed dashboard, then passed;
+- **re-pushed and re-rendered:** "share right (d527eec…) 0%", "answers 2", and bars named
+  qwen3.8-max and claude-opus-5. That's the user's visit: they said qwen3.8-max, and the
+  champion said claude-opus-5.
+
+**The rulings:**
+- **Task 8's ruling on the unusual-text limits is overturned in part,** as the reviewer
+  argued. Before a challenger is promoted, its limits are re-measured with its own recipe.
+  This is now a step of the promotion procedure in `Context.md`. Cost if wrong: none while
+  it's only a challenger, since its flags are never shown.
+- **`propose()` now takes `pinned_cvs`**, both pinned models' CVs, as the reviewer
+  proposed. Cost: none.
+- **The points the reviewer declined to judge:**
+  - the collector's stored fields were checked, and the model card now lists what it adds;
+  - the panels were checked by rendering them (above);
+  - branch protection on main is suggested to the user;
+  - the rest stand: keepalive in Firefox and Safari, the alert thresholds, action tags
+    rather than commit SHAs, code from before P6, and data retention.
+
+  Cost if wrong: small.
+
+**Docs, as the reviewer asked:**
+- the model card gives the 35 MB download, the "phone or not" fact the collector adds, and
+  that servers see the visitor's IP address, which the stored events don't include;
+- ADR 0007 gives the retraining's baseline after a promotion, the 60-day rule (G), and
+  where the intervals live.
+
+**Deferred minors**, not fixed:
+- **A, the rest:** if the visitor edits the text without pressing Identify again, their
+  answer still attaches to the result on screen.
+- **D:**
+  - the export's paging restarts just after a page's newest timestamp, so lines sharing that
+    millisecond can be dropped;
+  - `paired()` pools every pair of runs.
+- **E:**
+  - the dashboard has no page-commit filter;
+  - "another model" and "a person" answers don't feed the unusual-text counts;
+  - the length buckets sort as text;
+  - the reference text is copied by hand.
+- **F:** the retraining's branch name (`retrain/<date>`) collides on a same-day re-run,
+  leaving an orphan MLflow run; there's no concurrency group.
+- **I:** `push_monitoring.py` treats any 400 as "already exists", so a real validation
+  error surfaces as a 404.
+- **J:** keepalive with a custom header needs a CORS preflight, and was checked in Chromium
+  only.
+
+**Shipped:**
+- #60 (squash `9d6b8bf`), after CI passed;
+- the redeploy's smoke test on the live site: champion claude-opus-5 (11%), challenger
+  gpt-5.6-terra (19%);
+- the whole suite: 210 passed, with torch, transformers and peft.
 
 ## Process lessons
 
@@ -313,12 +407,15 @@ From the ledger, in order, each with its cost if wrong:
   variable the next step had but this one didn't.
 - **Give step-by-step instructions with the real values, not examples.** An example address
   ended up in a credentials file.
+- **Look at the rendered panel, not only its JSON.** Thirteen tests passed, and the real
+  Loki accepted every query, yet two panels showed unnamed numbers. P4 learned the same with
+  a headless browser. Grafana's render API turns a panel into an image in one call.
 
 ## How to retrace P6 yourself
 
 - The plan and the design: [plan](../superpowers/plans/2026-10-27-p6-mlops-loop.md),
   [design](../superpowers/specs/2026-10-27-p6-mlops-loop-design.md).
-- The pull requests #48 to #57, in order, with their CI runs.
+- The pull requests #48 to #58, in order, then #60 (the fix pass), with their CI runs.
 - **Run the checks:**
   - `uv run --all-extras pytest -q tests/test_telemetry.py tests/test_feedback.py
     tests/test_browser.py tests/test_deploy_space.py tests/test_monitoring.py
