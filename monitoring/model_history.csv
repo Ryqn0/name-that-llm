@@ -1,0 +1,12 @@
+date,model,cv,lb
+2026-10-24,cnb,0.2474,
+2026-10-24,svm,0.2848,
+2026-10-24,mnb,0.2852,
+2026-10-24,nbsvm,0.2971,
+2026-10-24,lr,0.3212,0.320
+2026-10-24,lr + assign (topic groups),0.4056,0.320
+2026-10-25,lm_blend_tuned,0.3963,
+2026-10-25,lm_blend (lr + Qwen 3 4B layers 6-9),0.4052,0.389
+2026-10-26,encoder (ModernBERT-base),0.3501,
+2026-10-26,ensemble (lr + LM head + ModernBERT),0.4219,0.410
+2026-10-27,lr + 30k pool passages,0.4205,
