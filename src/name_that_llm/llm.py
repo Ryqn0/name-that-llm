@@ -32,6 +32,7 @@ the text-only paths must never need them.
 
 import argparse
 import json
+import math
 import time
 from collections.abc import Sequence
 from pathlib import Path
@@ -150,7 +151,13 @@ def load_llm_classifier(cfg: LLMConfig, adapter_dir: Path | None = None, device:
     if getattr(model, "is_loaded_in_4bit", False):
         # Casts the few parts left in 16 bits (norms, embeddings) to float32 for stable
         # training, and turns gradient checkpointing on (see the module docstring).
-        model = peft.prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
+        model = peft.prepare_model_for_kbit_training(
+            model,
+            use_gradient_checkpointing=True,
+            # Passed explicitly, as PyTorch now asks: the non-reentrant variant is the
+            # recommended one, and it needs no gradient on the inputs.
+            gradient_checkpointing_kwargs={"use_reentrant": False},
+        )
     lora = peft.LoraConfig(
         task_type="SEQ_CLS",
         r=cfg.lora_r,
@@ -309,6 +316,47 @@ def predict_proba_adapters(
     return total / len(adapter_dirs)
 
 
+def probe_speed(cfg: LLMConfig, df: pd.DataFrame, n: int = 256, gpus: int = 2) -> dict:
+    """How long a full CV would take, from one fold's model trained 1 epoch on n passages.
+
+    Returns the seconds per training passage, the model's load time, the peak GPU memory,
+    and the projected minutes of a cfg.n_splits-fold CV spread over `gpus` GPUs, where the
+    busiest runs ceil(n_splits / gpus) folds. Each fold loads the model, trains on about
+    (k - 1) / k of our passages plus cfg.pool_size pool passages for cfg.epochs epochs,
+    then predicts the other 1 / k: a forward pass only, about a third of a training step.
+
+    Run it in a process of its own (main's --probe). A model freed inside a long-lived
+    process can keep holding GPU memory: in P7 Task 5's first run, 5.8 GB of a freed probe
+    model starved the fold that ran next on the same GPU.
+    """
+    import torch
+
+    probe = cfg.model_copy(update={"epochs": 1})
+    folds = make_folds(df, cfg.n_splits, cfg.seed).to_numpy()
+    y, prompts = df["model"].to_numpy(), df["prompt_id"].to_numpy()
+    texts, fit_y = fold_training_set(df["text"].tolist(), y, prompts, folds, 0, None, probe)
+    n = min(n, len(texts))
+    torch.manual_seed(cfg.seed)
+    start = time.time()
+    model, tokenizer = load_llm_classifier(probe)
+    load_s = time.time() - start
+    if torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats()
+    start = time.time()
+    train_encoder(model, tokenizer, _nonempty(texts[:n], tokenizer), fit_y[:n], probe)
+    per_passage = (time.time() - start) / n
+    peak_gb = torch.cuda.max_memory_allocated() / 1e9 if torch.cuda.is_available() else 0.0
+    k = cfg.n_splits
+    trained = len(df) * (k - 1) / k + cfg.pool_size  # passages per fold, per epoch
+    fold_s = load_s + per_passage * (trained * cfg.epochs + len(df) / k / 3)
+    return {
+        "seconds_per_passage": round(per_passage, 3),
+        "model_load_seconds": round(load_s, 1),
+        "peak_memory_gb": round(peak_gb, 2),
+        "projected_cv_minutes": round(math.ceil(k / gpus) * fold_s / 60, 1),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Train and predict some CV folds of the LLM classifier (one GPU each)."
@@ -316,18 +364,30 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", required=True, help="LLMConfig name (e.g. llm) or YAML path")
     parser.add_argument("--base-model", help="the base model's folder (overrides the config)")
     parser.add_argument("--seed", type=int, help="the folds' and training's seed (overrides)")
-    parser.add_argument("--folds", type=int, nargs="+", required=True, help="e.g. 0 2 4")
+    parser.add_argument("--folds", type=int, nargs="+", help="the folds to run, e.g. 0 2 4")
+    parser.add_argument(
+        "--probe", type=int, metavar="N", help="instead of folds: time 1 epoch on N passages"
+    )
     parser.add_argument("--pool", type=Path, help="the pool's parquet (pool.build_pool)")
     parser.add_argument("--save-dir", type=Path, help="save each fold's adapter to fold<k>/")
     parser.add_argument("--data-dir", type=Path, help="the folder with train.csv")
-    parser.add_argument("--out", type=Path, required=True, help=".npz: one array per fold")
+    parser.add_argument(
+        "--out", type=Path, required=True, help=".npz: one array per fold (--probe: a .json)"
+    )
     args = parser.parse_args(argv)
+    if (args.folds is None) == (args.probe is None):
+        parser.error("give either --folds or --probe")
 
     cfg = load_config(args.config, model_cls=LLMConfig)
     overrides = {"base_model": args.base_model, "seed": args.seed}
     cfg = cfg.model_copy(update={k: v for k, v in overrides.items() if v is not None})
+    df = load_train(args.data_dir)
+    if args.probe is not None:
+        timing = probe_speed(cfg, df, args.probe)
+        args.out.write_text(json.dumps(timing, indent=2), encoding="utf-8")
+        return 0
     pool = pd.read_parquet(args.pool) if args.pool else None
-    parts = run_folds_llm(cfg, load_train(args.data_dir), args.folds, pool, args.save_dir)
+    parts = run_folds_llm(cfg, df, args.folds, pool, args.save_dir)
     np.savez(args.out, **{f"fold{k}": proba for k, proba in parts.items()})
     return 0
 
