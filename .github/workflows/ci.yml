@@ -77,7 +77,7 @@ jobs:
       - run: uv run --no-sync python -c "import torch, transformers, peft"
       - run: >-
           uv run --no-sync pytest -q tests/test_lm.py tests/test_encoder.py tests/test_tune.py
-          tests/test_champion.py tests/test_registry.py tests/test_llm.py
+          tests/test_champion.py tests/test_registry.py tests/test_llm.py tests/test_notebooks.py
 
   # The live app's image (P4): it must build, carry Kaggle's torch and transformers (the
   # versions the champion was trained and checked with), import the app, and never contain

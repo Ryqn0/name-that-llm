@@ -5,6 +5,8 @@ Every test needs torch, transformers and peft, and this module skips without the
 bitsandbytes, so the tests load in float32 (load_in_4bit=False); the rest is the GPU path.
 """
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -152,3 +154,18 @@ def test_adapter_on_a_different_cut_is_refused(tiny_qwen, tmp_path):
     six = cfg.model_copy(update={"n_layers": 6})
     with pytest.raises(ValueError, match="n_layers"):
         predict_proba_adapters(six, [tmp_path / "fold0"], ["marker1"])
+
+
+def test_probe_writes_its_timing_from_its_own_process(tiny_qwen, fake_data_dir, tmp_path):
+    # The notebooks time one fold's training in a process of its own (`--probe`), so the
+    # probe's GPU memory is all returned before the folds start.
+    path = tmp_path / "llm.yaml"
+    path.write_text(yaml.safe_dump(_cfg(tiny_qwen).model_dump()), encoding="utf-8")
+    out = tmp_path / "timing.json"
+    argv = ["--config", str(path), "--data-dir", str(fake_data_dir), "--out", str(out)]
+    assert main([*argv, "--probe", "16"]) == 0
+    timing = json.loads(out.read_text(encoding="utf-8"))
+    keys = {"seconds_per_passage", "model_load_seconds", "peak_memory_gb", "projected_cv_minutes"}
+    assert set(timing) == keys and timing["seconds_per_passage"] >= 0
+    with pytest.raises(SystemExit):  # neither --folds nor --probe
+        main(argv)
