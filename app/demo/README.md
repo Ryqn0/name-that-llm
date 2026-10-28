@@ -78,9 +78,29 @@ held-out predictions, we measured how often the best guess is right at each leve
 Balanced accuracy is the average, over the 18 models, of the share of each model's
 passages that are named correctly.
 
+## What the page sends
+
+When monitoring is switched on, the page sends small anonymous events, so we can see whether
+the site works and how the models do on real texts:
+
+- **when it loads:** how long the model took to load, and whether it loaded;
+- **after each answer:** how long it took, the passage's length rounded down to 25 words,
+  the predicted model and its "How sure?" level, and why the text looked unusual, if it did.
+  When a second model is being tested, it scores the same text silently, and its guess is
+  sent too; you always see the same model's answer;
+- **if you answer "Do you know who wrote it?":** your answer, with what the page predicted;
+- **errors:** where they happened, and their message. A message that quotes your text is
+  replaced by "[redacted]".
+
+**Your text never leaves your browser,** in any form: no excerpt, no fingerprint, no word
+list. There are no cookies, nothing is stored on your device, and nothing identifies you or
+links two visits.
+
 ## Limitations
 
-- Only the 18 models above, and only in English.
+- Only the 18 models above, and only in English. A text unlike the training passages (under
+  36 words, with many words the model has never seen, or mostly non-Latin letters) gets a
+  note asking you to treat the answer with extra care.
 - gemini-3.7-flash and gemini-3.8-flash are nearly impossible to tell apart: even a model
   trained on just those two barely beats a coin flip.
 - The training passages are 36 to 274 words long. The page works best on 50 to 300 words.

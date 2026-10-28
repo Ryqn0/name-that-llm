@@ -46,7 +46,7 @@ REQUIRED = (
     "MLFLOW_TRACKING_USERNAME",
     "MLFLOW_TRACKING_PASSWORD",
 )
-PAGE_FILES = ("index.html", "ntl.js", "telemetry.js", "README.md")  # from app/demo
+PAGE_FILES = ("index.html", "ntl.js", "telemetry.js", "feedback.js", "README.md")  # app/demo
 MODEL_FILES = ("model.json", "weights.bin")  # from the pinned MLflow run(s)
 
 # Written for this smoke test, in the plain style of a chatbot answer. Never a competition

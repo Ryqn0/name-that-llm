@@ -1,7 +1,10 @@
 <!doctype html>
 <!-- The free demo's only page (P4 revision, design §12; layout B of design §3). A static
      page: the TF-IDF model `lr` runs right here, in the visitor's browser, through ntl.js.
-     The page downloads its own files and sends nothing anywhere. -->
+     P6: when config.json names a collector, the page also sends anonymous events
+     (telemetry.js: load and answer times, errors, the predicted model, the visitor's
+     optional "Do you know who wrote it?" answer). The pasted text is never sent. -->
+
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -56,6 +59,11 @@
   .warning ul { margin: 6px 0 0; padding-left: 20px; }
   a { color: var(--accent); }
   footer { margin-top: 14px; font-size: 13px; }
+  .note { border-left: 4px solid var(--warning); background: var(--track); padding: 6px 12px;
+          margin-top: 12px; border-radius: 6px; }
+  select { padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border); max-width: 100%;
+           background: var(--bg); color: var(--text); font: inherit; }
+  .notice { margin-top: 10px; font-size: 13px; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -80,6 +88,14 @@
     <span class="pill" id="sure"></span>
     <div class="bars collapsed" id="bars"></div>
     <div class="row"><button class="link" id="toggle">Show all 18 ▾</button></div>
+    <div class="note" id="unusual" hidden>This text looks unlike what the model learned from:
+      treat the answer with extra care.</div>
+    <div class="row" id="feedback">
+      <label for="actual" class="muted">Do you know who wrote it?</label>
+      <select id="actual"><option value="">Choose…</option></select>
+      <button id="send-feedback">Send</button>
+      <span class="muted" id="thanks" hidden>Thank you! It shows how the models do on real texts.</span>
+    </div>
   </section>
 
   <div class="warning">
@@ -96,15 +112,45 @@
     </ul>
     <div style="margin-top:6px"><a href="https://github.com/Ryqn0/name-that-llm/blob/main/app/demo/README.md">How it works, and its limits (model card) →</a></div>
   </div>
+  <!-- Shown only when the page really sends something (config.json names a collector). -->
+  <div class="muted notice" id="notice" hidden>Anonymous numbers are sent to help us keep the
+    site working: load and answer times, errors, the predicted model, and your optional answer.
+    Your text never leaves your browser.</div>
   <footer class="muted" id="footer"></footer>
 </main>
 
 <script type="module">
-  import { countWords, describeConfidence, loadModel, predictProba, rank } from "./ntl.js";
+  import { answer, newResult, OTHER_AUTHORS } from "./feedback.js";
+  import { countWords, describeConfidence, loadModel, predictProba, rank, unusualReasons } from "./ntl.js";
+  import { makeEvent, send, toCollectorPayload } from "./telemetry.js";
 
   const $ = (id) => document.getElementById(id);
   const MIN_WORDS = 20, MAX_WORDS = 1000;  // the full app's limits, counted after flattening
-  let model = null;
+  // The robot visitor (P6) opens the page with ?synthetic=1, so its visits are told apart.
+  const SYNTHETIC = new URLSearchParams(location.search).get("synthetic") === "1";
+  let model = null, challenger = null, challengerTried = false;
+  let config = { collector_url: "" }, version = {};
+  let current = null, currentText = "";  // the result the visitor may answer, and its text
+
+  // ---------- telemetry: fire-and-forget, and never the text ----------
+  // telemetry.js keeps only allowlisted fields, and redacts any free text that quotes the
+  // passage: `text` is passed for that check only. send() never throws and is never
+  // awaited, so monitoring can't break or slow the page. No collector, nothing is sent.
+  function report(name, fields, text = "") {
+    try {
+      const ctx = { labels: model ? model.labels : [], bands: model ? model.bands : [], text };
+      const meta = { commit: version.commit ?? "", model_run: version.model_run ?? "",
+                     challenger_run: version.challenger_run ?? "", synthetic: SYNTHETIC };
+      send(toCollectorPayload([makeEvent(name, fields, ctx)], meta), config.collector_url);
+    } catch (error) {
+      console.warn("telemetry:", error);  // never shown to the visitor, never fatal
+    }
+  }
+
+  function reportError(where, error, text = "") {
+    const fields = { where, kind: error?.name ?? "Error", message: String(error?.message ?? error) };
+    report("error", fields, text);
+  }
 
   // One bar row: model, company, bar, percentage (built with DOM calls, never innerHTML).
   function addRow(grid, entry) {
@@ -142,11 +188,56 @@
       $("status").textContent = "Paste between 20 and 1,000 words; this text has " + words + ".";
       return;
     }
-    const start = performance.now();
-    const ranking = rank(model, predictProba(model, text));
-    show(ranking, describeConfidence(ranking[0].probability, model.bands));
-    $("status").className = "";
-    $("status").textContent = "Done in " + ((performance.now() - start) / 1000).toFixed(2) + " s, on your device.";
+    try {
+      const start = performance.now();
+      const ranking = rank(model, predictProba(model, text));
+      const band = describeConfidence(ranking[0].probability, model.bands);
+      show(ranking, band);
+      const answerMs = performance.now() - start;
+      $("status").className = "";
+      $("status").textContent = "Done in " + (answerMs / 1000).toFixed(2) + " s, on your device.";
+      const reasons = unusualReasons(model, text);
+      $("unusual").hidden = reasons.length === 0;
+      // Shadow mode: once loaded, the challenger scores the same text silently.
+      const challengerLabel = challenger ? rank(challenger, predictProba(challenger, text))[0].model : null;
+      current = newResult({ label: ranking[0].model, challenger_label: challengerLabel, band: band.label });
+      currentText = text;
+      resetFeedback();
+      report("answer", { answer_ms: answerMs, words, label: ranking[0].model, band: band.label,
+                         challenger_label: challengerLabel, unusual: reasons }, text);
+      loadChallenger();  // after the first answer only, so it never slows that one down
+    } catch (error) {
+      console.error(error);
+      $("status").className = "error";
+      $("status").textContent = "Something went wrong: try again, or reload the page.";
+      reportError("answer", error, text);
+    }
+  }
+
+  // ---------- "Do you know who wrote it?" (P6) ----------
+  function fillChoices() {
+    for (const choice of [...model.labels, ...OTHER_AUTHORS]) {
+      const option = document.createElement("option");
+      option.value = choice; option.textContent = choice;
+      $("actual").appendChild(option);
+    }
+  }
+
+  function resetFeedback() {
+    $("actual").value = ""; $("actual").disabled = false;
+    $("send-feedback").disabled = false; $("thanks").hidden = true;
+  }
+
+  // One answer per result, carrying that result's labels (feedback.js checks both).
+  function sendFeedback() {
+    try {
+      const fields = current && answer(current, $("actual").value, model.labels);
+      if (!fields) return;  // nothing chosen, or this result was already answered
+      report("feedback", fields, currentText);
+      $("actual").disabled = true; $("send-feedback").disabled = true; $("thanks").hidden = false;
+    } catch (error) {
+      reportError("feedback", error, currentText);
+    }
   }
 
   function ok(response) {
@@ -154,14 +245,45 @@
     return response;
   }
 
-  // Load the model once: its vocabulary and settings (model.json), then its weights.
-  async function load() {
+  async function getJson(path, fallback) {
+    try { return await fetch(path).then(ok).then((r) => r.json()); } catch { return fallback; }
+  }
+
+  // Shadow mode (P6): the challenger pinned in version.json loads after the first answer.
+  // One attempt per visit; a failure is reported and changes nothing for the visitor.
+  async function loadChallenger() {
+    if (challengerTried || !version.challenger_run) return;
+    challengerTried = true;
+    const start = performance.now();
     try {
-      const [json, weights, version] = await Promise.all([
-        fetch("model.json").then(ok).then((r) => r.json()),
-        fetch("weights.bin").then(ok).then((r) => r.arrayBuffer()),
-        fetch("version.json").then(ok).then((r) => r.json()).catch(() => ({})),
+      const [json, weights] = await Promise.all([
+        fetch("challenger/model.json").then(ok).then((r) => r.json()),
+        fetch("challenger/weights.bin").then(ok).then((r) => r.arrayBuffer()),
       ]);
+      challenger = loadModel(json, weights);
+      report("page_load", { load_ms: performance.now() - start, ok: true, what: "challenger" });
+    } catch (error) {
+      report("page_load", { load_ms: performance.now() - start, ok: false, what: "challenger" });
+      reportError("load", error);
+    }
+  }
+
+  // Load the model once: its vocabulary and settings (model.json), then its weights. The
+  // page's settings and versions come first, since every event needs them; both are optional.
+  async function load() {
+    const start = performance.now();
+    const settings = Promise.all([getJson("config.json", config), getJson("version.json", {})]);
+    const files = Promise.all([
+      fetch("model.json").then(ok).then((r) => r.json()),
+      fetch("weights.bin").then(ok).then((r) => r.arrayBuffer()),
+    ]);
+    files.catch(() => {});  // handled below: this only stops an early failure being "unhandled"
+    [config, version] = await settings;
+    // The notice, and the question whose answer is sent, appear only if something is sent.
+    $("notice").hidden = !config.collector_url;
+    $("feedback").hidden = !config.collector_url;
+    try {
+      const [json, weights] = await files;
       model = loadModel(json, weights);
       $("right").textContent = Math.round(10 * json.meta.cv_balanced_accuracy);
       // The footer says exactly what answers: the package, the registered model the
@@ -171,16 +293,21 @@
       if (version.model_run) parts.push("run " + version.model_run.slice(0, 7));
       if (version.commit) parts.push("commit " + version.commit.slice(0, 7));
       $("footer").textContent = parts.join(" · ");
+      fillChoices();
       $("status").textContent = "";
       $("identify").disabled = false;
+      report("page_load", { load_ms: performance.now() - start, ok: true, what: "champion" });
     } catch (error) {
       console.error(error);
       $("status").className = "error";
       $("status").textContent = "The model didn't load: reload the page to try again.";
+      report("page_load", { load_ms: performance.now() - start, ok: false, what: "champion" });
+      reportError("load", error);
     }
   }
 
   $("identify").addEventListener("click", identify);
+  $("send-feedback").addEventListener("click", sendFeedback);
   $("toggle").addEventListener("click", () => {
     const collapsed = $("bars").classList.toggle("collapsed");
     $("toggle").textContent = collapsed ? "Show all 18 ▾" : "Show the top 5 ▴";
