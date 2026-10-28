@@ -53,15 +53,22 @@ def parse_args(argv=None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def current_challenger_cv() -> float | None:
-    """The CV the current challenger's MLflow run logged, or None if there's no challenger."""
-    path = DEMO_DIR / "CHALLENGER_RUN"
-    run = path.read_text(encoding="utf-8").strip() if path.exists() else ""
-    if not run:
-        return None
+def pinned_cvs() -> list[float]:
+    """The CVs logged by the models the demo pins now: MODEL_RUN's, then CHALLENGER_RUN's.
+
+    A missing or empty pin, or a run that logged no CV, is skipped: no challenger yet is the
+    usual case, and the bootstrap against the champion's recipe still decides.
+    """
     import mlflow
 
-    return mlflow.get_run(run).data.metrics.get("cv_balanced_accuracy")
+    cvs = []
+    for name in ("MODEL_RUN", "CHALLENGER_RUN"):
+        path = DEMO_DIR / name
+        run = path.read_text(encoding="utf-8").strip() if path.exists() else ""
+        cv = mlflow.get_run(run).data.metrics.get("cv_balanced_accuracy") if run else None
+        if cv is not None:
+            cvs.append(cv)
+    return cvs
 
 
 def open_pull_request(run_id: str, numbers: dict) -> None:
@@ -72,6 +79,9 @@ def open_pull_request(run_id: str, numbers: dict) -> None:
     bot += ["-c", "user.email=41898282+github-actions[bot]@users.noreply.github.com"]
     title = f"feat(demo): a new challenger, CV {numbers['candidate_cv']:.4f} (weekly retraining)"
     for command in (
+        # The checkout keeps no credentials (persist-credentials: false), so `git push` gets
+        # them from gh, which reads GH_TOKEN: only this step ever holds the write token.
+        ["gh", "auth", "setup-git"],
         ["git", "switch", "-c", branch],
         ["git", "add", str(DEMO_DIR / "CHALLENGER_RUN")],
         ["git", *bot, "commit", "-m", title],
@@ -105,15 +115,16 @@ def main(argv=None) -> None:
     print("1. the champion's recipe (lr) and the candidate (lr + the pool), same folds", flush=True)
     champion = run_cv_pool(cfg, train)
     candidate = run_cv_pool(cfg, train, pool, max_pool=POOL_CAP)
-    current = current_challenger_cv()
+    current = pinned_cvs()
     yes, numbers = propose(y, groups, champion.pred, candidate.pred, candidate.score, current)
     print(
         f"   champion's recipe {numbers['champion_cv']:.4f} | candidate "
         f"{numbers['candidate_cv']:.4f} | difference {numbers['diff']:+.4f}, 95% interval "
-        f"[{numbers['lo']:+.4f}, {numbers['hi']:+.4f}] | current challenger {current}"
+        f"[{numbers['lo']:+.4f}, {numbers['hi']:+.4f}] | pinned models' CVs {current}"
     )
     if not yes:
-        print("no proposal: the candidate doesn't clearly beat the champion, or the challenger")
+        print("no proposal: the candidate doesn't clearly beat the champion's recipe, or")
+        print("doesn't beat the models the demo pins by 0.005")
         return
 
     print("2. the candidate, fit on all our passages plus the capped pool", flush=True)
