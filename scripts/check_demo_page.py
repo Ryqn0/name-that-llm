@@ -5,8 +5,10 @@ request from the staged folder: Avast on this PC cuts large localhost transfers,
 is never served over HTTP. A fake collector on the page's own origin records what the page
 would send to Grafana. Four cases:
   1. a recording collector, with ?synthetic=1: a paste sends page_load and answer, then the
-     challenger's page_load; one feedback sends one `feedback`, and a second click sends
-     nothing; no recorded body holds a word of the passage; every event says synthetic;
+     challenger's page_load; one feedback sends one `feedback`, carrying the challenger's
+     label (it scores the text on screen once loaded), and a second click sends nothing;
+     a second answer carries the challenger's label and time; no recorded body holds a word
+     of the passage; every event says synthetic;
   2. a collector answering 500, then one whose requests are aborted: the page gives the
      same answer and thanks the visitor, exactly as in case 1 (monitoring can't break it);
   3. a pinned challenger whose files are missing: answers still come, without a
@@ -129,7 +131,9 @@ def run(browser, staged: Path, collector: str, query: str = "", shots: Path | No
     page.click("#send-feedback")
     page.wait_for_selector("#thanks:not([hidden])")
     sent_twice = page.is_enabled("#send-feedback")
-    page.wait_for_timeout(500)
+    # A second answer: the challenger has loaded, so it scores this one too, in shadow.
+    page.click("#identify")
+    page.wait_for_timeout(1000)
     if shots is not None:
         shots.mkdir(parents=True, exist_ok=True)
         page.screenshot(path=str(shots / "page-900.png"), full_page=True)
@@ -165,6 +169,17 @@ def main(argv=None) -> None:
         check(names[:3] == expected, f"page_load, answer, challenger page_load: {names}", failures)
         check(names.count(("feedback", "")) == 1, "exactly one feedback", failures)
         check(not one["again"], "the Send button is off once answered", failures)
+        check(
+            names[3:] == [("feedback", ""), ("answer", "")],
+            f"then feedback, answer: {names}",
+            failures,
+        )
+        events = one["events"]
+        feedback = next(e for e in events if e["name"] == "feedback")["attributes"]
+        check(bool(feedback.get("challenger_label")), "the 1st text, scored once loaded", failures)
+        second = [e for e in events if e["name"] == "answer"][1]["attributes"]
+        both = second.get("challenger_label") and second.get("challenger_ms")
+        check(bool(both), "the 2nd answer: the challenger's label and time", failures)
         answer = next(e for e in one["events"] if e["name"] == "answer")["attributes"]
         check(
             bool(answer.get("challenger_label")) is False,

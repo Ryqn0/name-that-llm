@@ -15,14 +15,35 @@ events never do, and neither do "another model" or "a person" (no model of ours 
 right there). scripts/export_events.py runs this every week and keeps the numbers.
 """
 
+import json
 import math
-import shlex
+import re
 
 import pandas as pd
 
 from name_that_llm.labels import LABELS
 
-PREFIX = "event_data_"  # how Grafana's Faro pipeline names an event's attributes in Loki
+PREFIX = "event_data_"
+# One logfmt pair: key=value, where a value with spaces is double-quoted, Go-style escaped.
+_PAIR = re.compile(r'(\w+)=("(?:[^"\\]|\\.)*"|\S*)')
+
+
+def _logfmt(line: str) -> dict:
+    """The key=value pairs of one logfmt line, quoted values unquoted.
+
+    Written by hand rather than with shlex: logfmt leaves an apostrophe unquoted ("can't"),
+    which shlex reads as an unclosed quote and refuses. Anyone can send events to the
+    public collector, so one junk value must not sink a week's export.
+    """
+    pairs = {}
+    for key, value in _PAIR.findall(line):
+        if value.startswith('"'):
+            try:
+                value = json.loads(value)  # Go's escapes read the same as JSON's
+            except ValueError:
+                value = value[1:-1]
+        pairs[key] = value
+    return pairs  # how Grafana's Faro pipeline names an event's attributes in Loki
 
 
 def parse_loki(response: dict) -> pd.DataFrame:
@@ -34,7 +55,7 @@ def parse_loki(response: dict) -> pd.DataFrame:
     rows = []
     for stream in response["data"]["result"]:
         for stamp, line in stream["values"]:
-            pairs = dict(token.split("=", 1) for token in shlex.split(line) if "=" in token)
+            pairs = _logfmt(line)
             row = {"time": pd.to_datetime(int(stamp), unit="ns", utc=True)}
             row["name"] = pairs.get("event_name")
             row["app_version"] = pairs.get("app_version")
@@ -53,6 +74,8 @@ def event_counts(events: pd.DataFrame) -> dict:
     out = {"events": len(events)}
     keys = ["real_visits", "real_answers", "real_feedback", "real_errors"]
     if events.empty:
+        return out | dict.fromkeys(keys, 0)
+    if not {"name", "synthetic"} <= set(events):  # junk events can lack any field
         return out | dict.fromkeys(keys, 0)
     real = events[events["synthetic"] == "false"]
     visits = (real["name"] == "page_load") & (real.get("what") == "champion")
@@ -76,7 +99,7 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
 
 def _answers(events: pd.DataFrame) -> pd.DataFrame:
     """Real visitors' feedback rows whose answer names one of our 18 models."""
-    if events.empty or "actual" not in events:
+    if events.empty or not {"name", "synthetic", "actual", "label", "model_run"} <= set(events):
         return events.iloc[0:0]
     rows = events[(events["name"] == "feedback") & (events["synthetic"] == "false")]
     return rows[rows["actual"].isin(LABELS)]
