@@ -23,6 +23,12 @@ Newest entry first. Each entry follows the same format: **Did / Learned / Scores
 - **P7 Task 5:** the first Qwen3-8B run on Kaggle's two T4s. The first try ran out of
   memory, which was fixed, and the second ran for 4 hours.
 - **P7 Task 6 started:** notebook 11 explores depth, length and the pool for the LLM.
+- **Late in the session:**
+  - you asked for the better model on your own PC: the full champion ran locally (ready
+    after 410 s the first time, then 3.9 s a passage);
+  - notebook 10's run was logged to W&B from the PC;
+  - **I-029 started:** the pool inside the ensemble's `lr`, a CPU check that runs
+    overnight.
 
 **Learned**
 - **Test against the real service before building on its docs.** One synthetic test event

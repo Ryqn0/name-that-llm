@@ -284,28 +284,43 @@ CV = the seed-42 folds, the same for every row.
 
 State at the end of session 9 (2026-10-28): **P6 is done**, and the monitoring loop is
 live. **P7 Tasks 1–5 are done, and Task 6 is running on Kaggle**: notebook 11, pushed
-22:41, at most 11 hours.
+22:41, at most 11 hours. **I-029 is running on this PC**, detached from the session. Work
+on the branch `p7-i029-pool-ensemble`, which is pushed but not merged.
 
-1. **P7 Task 6's results:**
-   - the poller downloads them into `data/kaggle-outputs/llm-explore`;
+1. **I-029: does the pool help the ensemble, through its `lr` member?**
+   - Read `data/runs/i029-pool-ensemble.log`. Its last line is the verdict: PROMOTE if the
+     seed-42 bootstrap's lower bound is above 0.
+   - If the log is cut short, the PC slept or restarted: re-run
+     `python -I -X utf8 scripts/pool_ensemble_check.py`. It takes about an hour on CPU.
+   - **If PROMOTE:** it's a submission candidate that needs no GPU (the user's OK), and it
+     becomes Task 7's `lr` member. Record the numbers in IDEAS I-029 either way, then ship
+     the branch.
+2. **P7 Task 6's results:**
+   - download them: `kaggle kernels output ryqn00/name-that-llm-llm-explore -p
+     data/kaggle-outputs/llm-explore`, with the Avast certificate variables set;
    - read `results.csv` and `llm-chosen.yaml`;
    - copy the chosen settings into `configs/llm.yaml`, with their evidence, including
      whether the pool helped the LLM;
-   - fill in notebook 11's Findings, and ship.
+   - fill in notebook 11's Findings, and ship (branch `p7-06-llm-explore`).
 
    The ledger: `.superpowers/sdd/2026-10-27-p7-llm-ensemble/progress.md`.
-2. **Log the GPU runs' results to W&B from the PC** (notebooks 10 and 11). Kaggle gives no
-   secret to API-pushed runs.
-3. **P7 Task 7:** the final LLM run on the chosen settings (seeds 42, 43, 44), the
+3. **W&B for the GPU runs, logged from the PC** (Kaggle gives no secret to API-pushed
+   runs):
+   - notebook 10 is logged: run `u0062ugi`, by `scripts/log_gpu_run.py`;
+   - notebook 11 gives fold scores, not a full OOF file, so logging its results table needs
+     a small addition to the script.
+4. **P7 Task 7:** the final LLM run on the chosen settings (seeds 42, 43, 44), the
    four-member ensemble, and the A/B gate. It needs the user's OK for its GPU push.
-4. **Now and then:**
+   - As planned, it could take up to 30 GPU-hours: more than one 12-hour Kaggle session,
+     and about a week's quota. Split it.
+5. **Now and then:**
    - look at the dashboard;
    - answer "Do you know who wrote it?" on texts whose author you know;
    - weekly: the retraining may open a challenger PR, which is a person's decision.
-5. **Suggested, your setting:** branch protection on main (pull requests only, CI
+6. **Suggested, your setting:** branch protection on main (pull requests only, CI
    required). The retraining's token can write to the repo, and protection keeps main
    reachable through reviewed, tested pull requests only.
-6. Cheap follow-ups:
+7. Cheap follow-ups:
    - I-015: a calibrated or log blend, in P7 Task 7;
    - I-017: TF without IDF;
    - I-018: the weight grid inside each Optuna trial;
