@@ -42,3 +42,5 @@ jobs:
           HF_SPACE: ${{ vars.HF_SPACE }}
           MLFLOW_TRACKING_URI: ${{ vars.MLFLOW_TRACKING_URI }}
           MLFLOW_TRACKING_USERNAME: ${{ vars.DAGSHUB_USER }}
+          # The monitoring collector's address (P6). Unset, it's empty: no telemetry.
+          GRAFANA_COLLECTOR_URL: ${{ vars.GRAFANA_COLLECTOR_URL }}
