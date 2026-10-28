@@ -25,7 +25,7 @@ import pandas as pd
 
 from name_that_llm.live import event_counts, live_accuracy, paired, parse_loki
 
-QUERY = '{app_name="name-that-llm-demo", kind="event"}'  # every event of the demo
+QUERY = '{service_name="name-that-llm-demo", kind="event"}'  # as labeled on the real stack
 LIMIT = 5000  # Loki's usual maximum of lines per query
 
 
