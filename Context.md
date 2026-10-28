@@ -80,6 +80,13 @@ outputs are a public repo, a progress diary, and a live demo app.
     registry. The FastAPI app and its Docker image run it on CPU, about 3.7 s a passage
     ([ADR 0004](docs/adr/0004-serve-the-champion-on-cpu.md)). It runs locally only: since
     2026, Hugging Face needs PRO for Docker Spaces (I-026).
+    - **To run it:** load `C:\Users\dungr\.dagshub.env`, then run
+      `uv run --all-extras --with torch --with transformers uvicorn name_that_llm.serve:app --port 7860`,
+      and open <http://localhost:7860>.
+    - **Measured on 2026-10-28:** ready after 410 s on the first start (downloads), then
+      3.9 s a passage.
+    - It loads whatever is `@champion` in the registry, so a new champion appears on the
+      next restart.
   - Before that, P5 (fine-tuned encoders, which gave the champion LB 0.410) and P3 (prompt
     assignment, then LM features) were completed. Kaggle's T4 accelerator provides
     **2 GPUs**; we use one so far (I-019).
