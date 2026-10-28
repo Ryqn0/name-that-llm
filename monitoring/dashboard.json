@@ -65,7 +65,7 @@
             "type": "loki",
             "uid": "${datasource}"
           },
-          "expr": "sum(count_over_time({app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"page_load\" | event_data_synthetic=\"false\" | event_data_what=\"champion\" [$__interval]))",
+          "expr": "sum(count_over_time({service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"page_load\" | event_data_synthetic=\"false\" | event_data_what=\"champion\" [$__interval]))",
           "legendFormat": "visits",
           "queryType": "range"
         }
@@ -93,7 +93,7 @@
             "type": "loki",
             "uid": "${datasource}"
           },
-          "expr": "quantile_over_time(0.5, {app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"page_load\" | event_data_synthetic=\"false\" | event_data_what=\"champion\" | unwrap event_data_load_ms [$__interval]) by ()",
+          "expr": "quantile_over_time(0.5, {service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"page_load\" | event_data_synthetic=\"false\" | event_data_what=\"champion\" | unwrap event_data_load_ms [$__interval]) by ()",
           "legendFormat": "load, median",
           "queryType": "range"
         },
@@ -103,7 +103,7 @@
             "type": "loki",
             "uid": "${datasource}"
           },
-          "expr": "quantile_over_time(0.95, {app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"page_load\" | event_data_synthetic=\"false\" | event_data_what=\"champion\" | unwrap event_data_load_ms [$__interval]) by ()",
+          "expr": "quantile_over_time(0.95, {service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"page_load\" | event_data_synthetic=\"false\" | event_data_what=\"champion\" | unwrap event_data_load_ms [$__interval]) by ()",
           "legendFormat": "load, 95th percentile",
           "queryType": "range"
         },
@@ -113,7 +113,7 @@
             "type": "loki",
             "uid": "${datasource}"
           },
-          "expr": "quantile_over_time(0.5, {app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"false\" | unwrap event_data_answer_ms [$__interval]) by ()",
+          "expr": "quantile_over_time(0.5, {service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"false\" | unwrap event_data_answer_ms [$__interval]) by ()",
           "legendFormat": "answer, median",
           "queryType": "range"
         },
@@ -123,7 +123,7 @@
             "type": "loki",
             "uid": "${datasource}"
           },
-          "expr": "quantile_over_time(0.95, {app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"false\" | unwrap event_data_answer_ms [$__interval]) by ()",
+          "expr": "quantile_over_time(0.95, {service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"false\" | unwrap event_data_answer_ms [$__interval]) by ()",
           "legendFormat": "answer, 95th percentile",
           "queryType": "range"
         }
@@ -157,7 +157,7 @@
             "type": "loki",
             "uid": "${datasource}"
           },
-          "expr": "sum by (event_data_where) (count_over_time({app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"error\" | event_data_synthetic=\"false\" [$__interval]))",
+          "expr": "sum by (event_data_where) (count_over_time({service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"error\" | event_data_synthetic=\"false\" [$__interval]))",
           "legendFormat": "{{event_data_where}}",
           "queryType": "range"
         }
@@ -185,7 +185,7 @@
             "type": "loki",
             "uid": "${datasource}"
           },
-          "expr": "sum(count_over_time({app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"true\" [$__interval]))",
+          "expr": "sum(count_over_time({service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"true\" [$__interval]))",
           "legendFormat": "robot answers",
           "queryType": "range"
         },
@@ -195,7 +195,7 @@
             "type": "loki",
             "uid": "${datasource}"
           },
-          "expr": "quantile_over_time(0.5, {app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"true\" | unwrap event_data_answer_ms [$__interval]) by ()",
+          "expr": "quantile_over_time(0.5, {service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"true\" | unwrap event_data_answer_ms [$__interval]) by ()",
           "legendFormat": "robot answer time (ms)",
           "queryType": "range"
         }
@@ -236,7 +236,7 @@
             "type": "loki",
             "uid": "${datasource}"
           },
-          "expr": "sum(count_over_time({app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"feedback\" | event_data_synthetic=\"false\" | label_format right=`{{ if eq .event_data_actual .event_data_label }}1{{ else }}0{{ end }}` | right=\"1\" [$__range])) / sum(count_over_time({app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"feedback\" | event_data_synthetic=\"false\" [$__range]))",
+          "expr": "sum(count_over_time({service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"feedback\" | event_data_synthetic=\"false\" | label_format right=`{{ if eq .event_data_actual .event_data_label }}1{{ else }}0{{ end }}` | right=\"1\" [$__range])) / sum(count_over_time({service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"feedback\" | event_data_synthetic=\"false\" [$__range]))",
           "legendFormat": "champion",
           "queryType": "instant"
         }
@@ -271,7 +271,7 @@
             "type": "loki",
             "uid": "${datasource}"
           },
-          "expr": "sum(count_over_time({app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"feedback\" | event_data_synthetic=\"false\" | event_data_challenger_label!=\"\" | label_format right=`{{ if eq .event_data_actual .event_data_challenger_label }}1{{ else }}0{{ end }}` | right=\"1\" [$__range])) / sum(count_over_time({app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"feedback\" | event_data_synthetic=\"false\" | event_data_challenger_label!=\"\" [$__range]))",
+          "expr": "sum(count_over_time({service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"feedback\" | event_data_synthetic=\"false\" | event_data_challenger_label!=\"\" | label_format right=`{{ if eq .event_data_actual .event_data_challenger_label }}1{{ else }}0{{ end }}` | right=\"1\" [$__range])) / sum(count_over_time({service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"feedback\" | event_data_synthetic=\"false\" | event_data_challenger_label!=\"\" [$__range]))",
           "legendFormat": "challenger",
           "queryType": "instant"
         }
@@ -306,7 +306,7 @@
             "type": "loki",
             "uid": "${datasource}"
           },
-          "expr": "sum by (event_data_actual) (count_over_time({app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"feedback\" | event_data_synthetic=\"false\" [$__range]))",
+          "expr": "sum by (event_data_actual) (count_over_time({service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"feedback\" | event_data_synthetic=\"false\" [$__range]))",
           "legendFormat": "{{event_data_actual}}",
           "queryType": "instant"
         }
@@ -347,7 +347,7 @@
             "type": "loki",
             "uid": "${datasource}"
           },
-          "expr": "sum by (event_data_words) (count_over_time({app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"false\" [$__range]))",
+          "expr": "sum by (event_data_words) (count_over_time({service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"false\" [$__range]))",
           "legendFormat": "{{event_data_words}}",
           "queryType": "instant"
         }
@@ -379,7 +379,7 @@
             "type": "loki",
             "uid": "${datasource}"
           },
-          "expr": "sum by (event_data_label) (count_over_time({app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"false\" [$__range]))",
+          "expr": "sum by (event_data_label) (count_over_time({service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"false\" [$__range]))",
           "legendFormat": "{{event_data_label}}",
           "queryType": "instant"
         }
@@ -411,7 +411,7 @@
             "type": "loki",
             "uid": "${datasource}"
           },
-          "expr": "sum by (event_data_band) (count_over_time({app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"false\" [$__range]))",
+          "expr": "sum by (event_data_band) (count_over_time({service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"false\" [$__range]))",
           "legendFormat": "{{event_data_band}}",
           "queryType": "instant"
         }
@@ -443,7 +443,7 @@
             "type": "loki",
             "uid": "${datasource}"
           },
-          "expr": "sum by (event_data_unusual) (count_over_time({app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"false\" [$__range]))",
+          "expr": "sum by (event_data_unusual) (count_over_time({service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"false\" [$__range]))",
           "legendFormat": "{{event_data_unusual}}",
           "queryType": "instant"
         }

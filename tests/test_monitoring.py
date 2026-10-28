@@ -83,3 +83,10 @@ def test_model_history_lists_the_models_by_date():
     lines = (ROOT / "monitoring" / "model_history.csv").read_text(encoding="utf-8").splitlines()
     assert lines[0] == "date,model,cv,lb"
     assert all(re.fullmatch(r"2026-\d\d-\d\d,[^,]+,0\.\d+,(0\.\d+)?", line) for line in lines[1:])
+
+
+def test_queries_use_the_labels_seen_on_the_real_stack():
+    # Checked on the user's stack (2026-10-28) with a test event: Grafana's pipeline puts the
+    # app in the stream label service_name (not app_name), next to kind="event".
+    exprs = _loki_exprs(DASHBOARD["panels"]) + [r["data"][0]["model"]["expr"] for r in ALERTS]
+    assert all('{service_name="name-that-llm-demo", kind="event"}' in e for e in exprs)

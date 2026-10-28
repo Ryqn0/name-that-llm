@@ -72,12 +72,14 @@ def test_payload_of_a_real_flow_contains_no_word_of_the_passage(fake_train, tmp_
 
 
 def test_payload_matches_the_collector_format():
-    # Grafana's collector (Faro): events with STRING attributes, and meta.app only. No
-    # session, user, page or browser part, so no payload can tell two visitors apart.
+    # Grafana's collector (Faro): events with STRING attributes; meta.app, and meta.sdk,
+    # which the collector requires (checked on the real stack: "no SDK version" otherwise).
+    # No session, user, page or browser part, so no payload can tell two visitors apart.
     fields = {"load_ms": 812.4, "ok": True, "what": "champion"}
     payload = make([{"name": "page_load", "fields": fields}])["payload"]
-    assert set(payload) == {"events", "meta"} and set(payload["meta"]) == {"app"}
+    assert set(payload) == {"events", "meta"} and set(payload["meta"]) == {"app", "sdk"}
     assert payload["meta"]["app"]["version"] == "abc1234"
+    assert payload["meta"]["sdk"] == {"name": "name-that-llm-telemetry", "version": "1.0.0"}
     (event,) = payload["events"]
     assert event["name"] == "page_load" and event["timestamp"]
     assert event["attributes"] == {
@@ -98,4 +100,14 @@ def test_word_counts_are_bucketed():
 def test_send_never_throws():
     # Port 9 refuses connections; an empty URL means no collector is configured.
     for url in ("http://127.0.0.1:9/collect", ""):
-        assert run_engine("send", {"url": url}) == {"resolved": True}
+        assert run_engine("send", {"url": url})["resolved"] is True
+
+
+def test_every_request_gets_a_fresh_random_session_id():
+    # The collector refuses a request without an X-Faro-Session-Id header (checked on the
+    # real stack). A fresh random id per REQUEST satisfies it while linking nothing: not
+    # two visits, not even two events of one visit.
+    sent = run_engine("send", {"url": "https://collector.test/collect/key", "capture": 2})
+    ids = [request["headers"]["X-Faro-Session-Id"] for request in sent["requests"]]
+    assert len(ids) == 2 and ids[0] != ids[1] and all(len(i) >= 16 for i in ids)
+    assert all(request["keepalive"] for request in sent["requests"])

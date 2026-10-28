@@ -6,7 +6,7 @@
 // And for tests/test_telemetry.py, the page's telemetry (telemetry.js):
 //   node cli.mjs event     {"events": [{"name", "fields"}], "ctx": {...}, "meta": {...}}
 //                          -> {"events": [...], "payload": {...}}, or {"error": "..."}
-//   node cli.mjs send      {"url": "..."}                   -> {"resolved": true}
+//   node cli.mjs send      {"url": "...", "capture": n?}    -> {"resolved": true, "requests": [...]}
 // And for tests/test_feedback.py, the "Do you know who wrote it?" answer (feedback.js):
 //   node cli.mjs feedback  {"results": [...], "steps": [[i, choice], ...], "labels": [...]}
 //                          -> {"fields": [fields or null, one per step]}
@@ -38,8 +38,13 @@ if (command === "flatten") {
     answer({ error: error.message });
   }
 } else if (command === "send") {
-  await send({ events: [] }, request.url); // never rejects, or this would crash
-  answer({ resolved: true });
+  // With "capture": n, a fake fetch records n sends instead of reaching the network.
+  const requests = [];
+  const fake = async (url, init) => { requests.push({ url, ...init }); };
+  for (let i = 0; i < (request.capture || 1); i++) {
+    await send({ events: [] }, request.url, request.capture ? fake : undefined); // never rejects
+  }
+  answer({ resolved: true, requests });
 } else if (command === "feedback") {
   const results = request.results.map(newResult);
   const steps = request.steps.map(([i, choice]) => answerResult(results[i], choice, request.labels));

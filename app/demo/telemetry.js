@@ -107,6 +107,9 @@ export function toCollectorPayload(events, meta) {
         version: String(meta.commit ?? ""),
         environment: meta.synthetic ? "synthetic" : "production",
       },
+      // The collector refuses a payload that names no SDK ("no SDK version"). This isn't
+      // Grafana's Faro SDK, so it says so: this module, by name and version.
+      sdk: { name: "name-that-llm-telemetry", version: "1.0.0" },
     },
   };
 }
@@ -129,11 +132,19 @@ export async function send(payload, url, fetchImpl = globalThis.fetch) {
   try {
     await fetchImpl(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Faro-Session-Id": randomId() },
       body: JSON.stringify(payload),
       keepalive: true, // the request outlives the page if the visitor leaves
     });
   } catch {
     // A failed send is simply lost: monitoring must never break the page.
   }
+}
+
+// A fresh random id for every request. Grafana's collector refuses a request without an
+// X-Faro-Session-Id header (its own SDK tracks sessions). A new one each time satisfies it
+// while linking nothing: not two visits, not even two events of the same visit.
+function randomId() {
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }

@@ -24,7 +24,7 @@
         },
         "model": {
           "refId": "A",
-          "expr": "sum(count_over_time({app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"error\" | event_data_synthetic=\"false\" [1h]))",
+          "expr": "sum(count_over_time({service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"error\" | event_data_synthetic=\"false\" [1h]))",
           "queryType": "instant"
         }
       },
@@ -92,7 +92,7 @@
         },
         "model": {
           "refId": "A",
-          "expr": "sum(count_over_time({app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"true\" [12h]))",
+          "expr": "sum(count_over_time({service_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"true\" [12h]))",
           "queryType": "instant"
         }
       },
