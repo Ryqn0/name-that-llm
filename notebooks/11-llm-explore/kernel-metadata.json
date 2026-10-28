@@ -1,0 +1,23 @@
+{
+  "id": "ryqn00/name-that-llm-llm-explore",
+  "title": "Name That LLM - LLM explore",
+  "code_file": "llm_explore.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": false,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": [
+    "crtproduction/name-that-llm-open-pool"
+  ],
+  "competition_sources": [
+    "name-that-llm"
+  ],
+  "kernel_sources": [
+    "ryqn00/name-that-llm-llm-first"
+  ],
+  "model_sources": [
+    "qwen-lm/qwen-3/transformers/8b-base/1"
+  ]
+}
