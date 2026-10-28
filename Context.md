@@ -38,12 +38,24 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 - Phase: **P7 in progress** (LLM and ensemble:
   [design](docs/superpowers/specs/2026-10-27-p7-llm-ensemble-design.md),
-  [plan](docs/superpowers/plans/2026-10-27-p7-llm-ensemble.md)). Tasks 1–4 of 9 were done
-  on 2026-10-27. **P6** (the MLOps loop: watching the site and the models) is designed and
-  planned ([design](docs/superpowers/specs/2026-10-27-p6-mlops-loop-design.md),
-  [plan](docs/superpowers/plans/2026-10-27-p6-mlops-loop.md)); its tasks run on CPU during
-  P7's GPU waits. **P4** (App v1 and CD) was done on 2026-10-27
+  [plan](docs/superpowers/plans/2026-10-27-p7-llm-ensemble.md)). Tasks 1–5 of 9 are done.
+  **Task 6 is running on Kaggle** (notebook 11, pushed 2026-10-28 22:41).
+- **P6** (the MLOps loop) was done on 2026-10-28:
+  [plan](docs/superpowers/plans/2026-10-27-p6-mlops-loop.md),
+  [journal](docs/journal/p6-mlops-loop.md),
+  [ADR 0007](docs/adr/0007-watching-a-static-site.md).
+- **P4** (App v1 and CD) was done on 2026-10-27
   ([plan](docs/superpowers/plans/2026-10-26-p4-app.md), [journal](docs/journal/p4-app.md)).
+  - **Monitoring (P6):**
+    - the live demo sends anonymous events (never the text) to the Grafana Cloud stack;
+    - [the dashboard](https://sincerebagel1076.grafana.net/d/name-that-llm-demo), with
+      alerts by email: more than 5 real errors in an hour, or the robot silent 12 hours;
+    - a robot visitor every 6 hours (`robot.yml`);
+    - a weekly export to DagsHub, Mondays (`weekly-export.yml`);
+    - a weekly retraining that may propose a challenger by pull request, Sundays
+      (`retrain.yml`);
+    - **shadow mode is on:** the challenger is `lr` + the pool (CV 0.4186; MLflow run
+      `f59454cd`, pinned in `app/demo/CHALLENGER_RUN`), and it scores each text silently.
   - **P7 so far:**
     - Sinkhorn balancing was dropped: its 95% CI includes 0 (I-027).
     - The pool of public generated passages is built, with its safeguards. With 30,000 of
@@ -54,6 +66,10 @@ outputs are a public repo, a progress diary, and a live demo app.
       (I-028).
     - `llm.py` is built and tested on CPU: LoRA on 4-bit Qwen, with two folds at once on
       Kaggle's two T4s.
+    - **The first Qwen3-8B run** (notebook 10, pool-free, seed 7) took 4 h on two T4s:
+      - the LLM alone scored **0.3641**, against the encoder's 0.3590;
+      - the best 4-member blend scored **0.4523**, against the ensemble's 0.4293. That's
+        in-sample on seed 7; Task 7 judges it on fresh seeds.
   - **The free public demo is live:** <https://huggingface.co/spaces/Ryqn/name-that-llm>.
     It's a static Space: the page runs `lr` in the visitor's browser (`app/demo/ntl.js`,
     parity-tested against scikit-learn), so the text never leaves the device. Its model is
@@ -154,6 +170,16 @@ CV = the seed-42 folds, the same for every row.
   - **A new demo model:** run `python -X utf8 scripts/export_browser_model.py`
     (`--dry-run` first), then commit the `app/demo/MODEL_RUN` it writes. Update the
     numbers in `app/demo/README.md` by hand.
+  - **A new challenger** comes from the weekly retraining's pull request, which sets
+    `app/demo/CHALLENGER_RUN`. Merging it is a person's decision.
+  - **Promoting the challenger to champion:** a pull request that moves its run id from
+    `CHALLENGER_RUN` into `MODEL_RUN` and empties `CHALLENGER_RUN`. Its description gives
+    two sets of numbers: the offline gate's, from the challenger's MLflow run, and the live
+    ones, from the dashboard and the `live-feedback` export. Update `app/demo/README.md`'s
+    numbers by hand.
+- **Monitoring as code:** edit `monitoring/dashboard.json` or `monitoring/alerts.json`, then
+  run `python -X utf8 scripts/push_monitoring.py` with `C:\Users\dungr\.grafana.env` loaded.
+  Every push to Grafana needs the user's OK.
 - **A new champion version:** `python -X utf8 scripts/register_champion.py` with the
   DagsHub env loaded. MLflow prints an emoji, which Windows' cp1252 can't write without
   `-X utf8`.
@@ -189,8 +215,10 @@ CV = the seed-42 folds, the same for every row.
 - Kaggle `ryqn00`: token in `~/.kaggle/access_token`.
 - GitHub `Ryqn0`: repo `Ryqn0/name-that-llm`, public.
 - W&B: project `name-that-llm`, which must stay **private** because its `train-data`
-  artifact holds competition data. Locally the key comes from `wandb login`; in Kaggle
-  notebooks, from the Kaggle Secret `WANDB_API_KEY`.
+  artifact holds competition data. Locally the key comes from `wandb login`.
+  - **Kaggle doesn't hand secrets to runs pushed through its API**, so the GPU notebooks
+    log nothing to W&B, even with the Kaggle Secret `WANDB_API_KEY` attached. Their
+    results are files, logged from the PC.
   - It lives in the one-member team `dungryan0-ryan-dung` with visibility "Team", which is
     effectively private. **Before adding any teammate, switch the project to Private.**
   - Runs: [forge.coreweave.com/wandb/dungryan0-ryan-dung/name-that-llm](https://forge.coreweave.com/wandb/dungryan0-ryan-dung/name-that-llm).
@@ -199,13 +227,31 @@ CV = the seed-42 folds, the same for every row.
 - DagsHub `Ryqn0`: the **private** repo `Ryqn0/name-that-llm`, home of the MLflow registry
   (`name-that-llm` v1 `@champion`) and the experiment `browser-demo`. Locally, the
   `MLFLOW_TRACKING_URI`, `_USERNAME` and `_PASSWORD` variables come from
-  `C:\Users\dungr\.dagshub.env`, outside the repo; load it with a `while read` loop that
-  also reads a last line without a newline. In GitHub: the secret `DAGSHUB_TOKEN` and the
-  variables `DAGSHUB_USER` and `MLFLOW_TRACKING_URI`.
+  `C:\Users\dungr\.dagshub.env`, outside the repo. In GitHub: the secret `DAGSHUB_TOKEN`
+  and the variables `DAGSHUB_USER` and `MLFLOW_TRACKING_URI`.
+  - **To load it, and `.grafana.env`,** use a `while read` loop that also reads a last line
+    without a newline, and strips the Windows carriage returns:
+    `while IFS='=' read -r k v || [ -n "$k" ]; do [ -n "$k" ] && export "$k=${v%$'\r'}"; done < FILE`.
+    Without the strip, DagsHub answers 401.
 - Hugging Face `Ryqn` (not `Ryqn0`): the public static Space `Ryqn/name-that-llm`. In
   GitHub: the secret `HF_TOKEN` and the variable `HF_SPACE`. The variable `ENCODER_FOLDS`
   is left over from the Docker deploy, and unused.
-- Later: Grafana Cloud.
+- Grafana Cloud: the stack `sincerebagel1076` (<https://sincerebagel1076.grafana.net>).
+  - A free account gets one stack. A 14-day trial, then the free tier, with logs kept
+    about 2 weeks.
+  - The Frontend Observability app is `name-that-llm-demo`, and its allowed origin is the
+    Space's host.
+  - Locally, `C:\Users\dungr\.grafana.env` holds:
+    - `GRAFANA_URL`;
+    - `GRAFANA_TOKEN`, from the service account `push-monitoring`, role Editor;
+    - `GRAFANA_LOGS_URL`, `GRAFANA_LOGS_USER` and `GRAFANA_LOGS_TOKEN` (an access policy
+      `read-demo-logs`, `logs:read`).
+  - In GitHub: the variables `GRAFANA_COLLECTOR_URL`, `GRAFANA_LOGS_URL` and
+    `GRAFANA_LOGS_USER`, and the secret `GRAFANA_LOGS_TOKEN`.
+  - Alerts go to the contact point `email`, the default policy's.
+- GitHub secret `RETRAIN_PR_TOKEN`: a fine-grained token (this repo only; contents and pull
+  requests, write) for the weekly retraining's pull requests. A pull request opened with the
+  workflow's own token wouldn't run CI.
 
 ## Rules checklist
 
@@ -223,25 +269,27 @@ CV = the seed-42 folds, the same for every row.
 
 ## Next steps
 
-State at the end of session 8 (2026-10-27): **P7 Tasks 1–4 are done.** The three P7
-notebooks exist on Kaggle as placeholders, pushed so the W&B secret can be attached:
-llm-first and llm-explore are public, and llm-final stays private until 2027-01-13.
+State at the end of session 9 (2026-10-28): **P6 is done**, and the monitoring loop is
+live. **P7 Tasks 1–5 are done, and Task 6 is running on Kaggle**: notebook 11, pushed
+22:41, at most 11 hours.
 
-1. **The user, on kaggle.com:** attach the Kaggle Secret `WANDB_API_KEY` to each of
-   [llm-first](https://www.kaggle.com/code/ryqn00/name-that-llm-llm-first),
-   [llm-explore](https://www.kaggle.com/code/ryqn00/name-that-llm-llm-explore) and
-   [llm-final](https://www.kaggle.com/code/ryqn00/name-that-llm-llm-final): open it, then
-   Edit → Add-ons → Secrets. That's the W&B fix for every P7 GPU run (no P5 run logged to
-   W&B for lack of it).
-2. **P7 Task 5:**
-   - write `notebooks/10-llm-first`, the first Qwen3-8B run (pool-free, seed 7);
-   - smoke-test it locally;
-   - push it: at most 8 GPU-hours, and it needs the user's OK in that session.
+1. **P7 Task 6's results:**
+   - the poller downloads them into `data/kaggle-outputs/llm-explore`;
+   - read `results.csv` and `llm-chosen.yaml`;
+   - copy the chosen settings into `configs/llm.yaml`, with their evidence, including
+     whether the pool helped the LLM;
+   - fill in notebook 11's Findings, and ship.
 
-   The step-by-step ledger: `.superpowers/sdd/2026-10-27-p7-llm-ensemble/progress.md`.
-3. **P6 Task 1** (`app/demo/telemetry.js`), during that GPU run. Its Step 1 (the Grafana
-   collector's format) is done. Ledger: `.superpowers/sdd/2026-10-27-p6-mlops-loop/progress.md`.
-4. Cheap follow-ups:
+   The ledger: `.superpowers/sdd/2026-10-27-p7-llm-ensemble/progress.md`.
+2. **Log the GPU runs' results to W&B from the PC** (notebooks 10 and 11). Kaggle gives no
+   secret to API-pushed runs.
+3. **P7 Task 7:** the final LLM run on the chosen settings (seeds 42, 43, 44), the
+   four-member ensemble, and the A/B gate. It needs the user's OK for its GPU push.
+4. **Now and then:**
+   - look at the dashboard;
+   - answer "Do you know who wrote it?" on texts whose author you know;
+   - weekly: the retraining may open a challenger PR, which is a person's decision.
+5. Cheap follow-ups:
    - I-015: a calibrated or log blend, in P7 Task 7;
    - I-017: TF without IDF;
    - I-018: the weight grid inside each Optuna trial;
