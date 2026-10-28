@@ -31,6 +31,7 @@ extension.
 
 ## Journals
 
+- [P6: the MLOps loop, watching the site and the models](p6-mlops-loop.md) (2026-10-27 → 28)
 - [P4: the app and continuous deployment](p4-app.md) (2026-10-26 → 27)
 - [P5: fine-tuned encoders](p5-encoders.md) (2026-10-25 → 26)
 - P0 to P3b: not written. Their detail is in the DIARY, the plans and the pull requests
