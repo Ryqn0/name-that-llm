@@ -19,6 +19,7 @@ Usage:  python scripts/push_monitoring.py
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -59,6 +60,12 @@ def main() -> None:
         alerts = json.loads(alerts_text.replace("${LOKI_UID}", loki[0]["uid"]))
         for method, path, body in build_requests(dashboard, alerts, FOLDER):
             response = client.request(method, path, json=body)
+            if path.endswith("/alert-rules") and response.status_code == 403:
+                # Seen on the first push to a new stack: Grafana caches permissions, so the
+                # folder this token just created isn't in its rights yet. Wait, then retry.
+                print("alert rule: 403, Grafana's permission cache; retrying in 30 s")
+                time.sleep(30)
+                response = client.request(method, path, json=body)
             if path == "/api/folders" and response.status_code in (409, 412):
                 print("folder: already there")
                 continue
