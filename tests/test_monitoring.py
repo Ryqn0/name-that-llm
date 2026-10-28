@@ -158,3 +158,24 @@ def test_a_model_with_no_right_answer_shows_zero():
     # blank: every "right" count is completed with "or 0 * <all answers>".
     exprs = _loki_exprs([_panel(LIVE[0]), _panel(LIVE[1])])
     assert all(" or 0 * " in e for e in exprs if "right" in e and "label_format" in e)
+
+
+def test_counts_are_range_queries_reduced_to_their_last_value():
+    # Rendered on the real stack (2026-10-28): Grafana shows a Loki INSTANT query as one table
+    # that a stat or bar gauge reduces to a single unnamed number. Range queries give one
+    # series per value, named by its legend; the last point is the count over the time range.
+    for panel in DASHBOARD["panels"]:
+        if panel["type"] in ("stat", "bargauge"):
+            assert all(t["queryType"] == "range" for t in panel["targets"]), panel["title"]
+            assert panel["options"]["reduceOptions"]["calcs"] == ["lastNotNull"], panel["title"]
+
+
+def test_every_bar_is_named_even_when_it_is_alone():
+    # Rendered on the real stack (2026-10-28): Grafana hides the name of a panel's only
+    # value, unless a display name is set. A quiet demo often has one value per panel
+    # ("Predicted models: 2", but which model?), so each bar names its label explicitly.
+    for panel in DASHBOARD["panels"]:
+        if panel["type"] == "bargauge":
+            label = panel["targets"][0]["legendFormat"].strip("{}")
+            name = panel["fieldConfig"]["defaults"].get("displayName")
+            assert name == "${__field.labels." + label + "}", panel["title"]
