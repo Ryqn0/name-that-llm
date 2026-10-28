@@ -24,9 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          # A fine-grained token (this repo; contents and pull requests: write). A pull
-          # request opened with the workflow's own token wouldn't trigger CI.
-          token: ${{ secrets.RETRAIN_PR_TOKEN }}
+          # The workflow's own read-only token, not kept in .git/config: no step but the
+          # last one ever holds a token that can write (the final review's finding 2).
+          persist-credentials: false
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.13"
@@ -38,15 +38,18 @@ jobs:
           # them through this variable (the first run failed without it).
           NTL_DATA_DIR: ${{ runner.temp }}/data
         run: |
-          uvx --from "kaggle>=2.2.3" kaggle competitions download name-that-llm -p "$RUNNER_TEMP/data"
+          uvx --from "kaggle==2.2.5" kaggle competitions download name-that-llm -p "$RUNNER_TEMP/data"
           unzip -q "$RUNNER_TEMP/data/name-that-llm.zip" -d "$RUNNER_TEMP/data"
-          uv run --with "kaggle>=2.2.3" python scripts/build_pool.py --download \
+          uv run --with "kaggle==2.2.5" python scripts/build_pool.py --download \
             --root "$RUNNER_TEMP/external" --out "$RUNNER_TEMP/pool.parquet"
       - name: Retrain, and propose a challenger if it wins
         env:
           MLFLOW_TRACKING_URI: ${{ vars.MLFLOW_TRACKING_URI }}
           MLFLOW_TRACKING_USERNAME: ${{ vars.DAGSHUB_USER }}
           MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
+          # A fine-grained token (this repo; contents and pull requests: write). A pull
+          # request opened with the workflow's own token wouldn't trigger CI. gh reads it,
+          # and lends it to `git push` (retrain_challenger.py runs `gh auth setup-git`).
           GH_TOKEN: ${{ secrets.RETRAIN_PR_TOKEN }}
         run: >-
           uv run python scripts/retrain_challenger.py --data-dir "$RUNNER_TEMP/data"
