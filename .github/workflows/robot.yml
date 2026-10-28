@@ -1,0 +1,30 @@
+# The robot visitor (P6): every 6 hours, a headless browser opens the live demo, pastes a
+# passage written for the purpose, and expects an answer (scripts/robot_visit.py). If the
+# site is down, the model doesn't load or no answer comes, this workflow fails, and GitHub
+# emails the repo's owner. The page is opened with ?synthetic=1, so its events are tagged
+# and never counted as real visits; when monitoring is on, they draw the dashboard's robot
+# line, and Grafana alerts if they stop for 12 hours.
+name: robot
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"  # 00:00, 06:00, 12:00 and 18:00 UTC
+  workflow_dispatch:  # a manual "visit now" button, in GitHub's Actions tab
+
+permissions:
+  contents: read  # it only reads the repo; it needs no secret at all
+
+jobs:
+  visit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+      # The script needs Playwright only, not the project: --no-project keeps it light.
+      - run: uv run --no-project --with playwright==1.64.1 playwright install --with-deps chromium
+      - run: >-
+          uv run --no-project --with playwright==1.64.1 python scripts/robot_visit.py
+          --url https://ryqn-name-that-llm.static.hf.space
