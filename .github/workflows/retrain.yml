@@ -1,0 +1,50 @@
+# Weekly retraining (P6): every Sunday, the demo's recipe (`lr`) is retrained with the
+# latest pool of public generated passages (scripts/retrain_challenger.py). If the result
+# clearly beats the champion on our folds, and isn't below the current challenger, the job
+# opens a pull request that makes it the demo's challenger (shadow mode). It never changes
+# the site itself: a person decides by merging.
+#
+# The competition data and the pool live in the runner's temporary space only. The job
+# prints scores and counts only, and uploads no artifact: this repo's Actions logs are
+# public, and the competition's rules forbid sharing its passages.
+name: retrain
+
+on:
+  schedule:
+    - cron: "0 3 * * 0"  # Sundays, 03:00 UTC
+  workflow_dispatch:  # a manual "retrain now" button, in GitHub's Actions tab
+
+permissions:
+  contents: read  # the push and the pull request use RETRAIN_PR_TOKEN instead
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # A fine-grained token (this repo; contents and pull requests: write). A pull
+          # request opened with the workflow's own token wouldn't trigger CI.
+          token: ${{ secrets.RETRAIN_PR_TOKEN }}
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+      - run: uv sync --locked --all-extras
+      - name: Download the competition data and build the pool (temporary space only)
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+        run: |
+          uvx --from "kaggle>=2.2.3" kaggle competitions download name-that-llm -p "$RUNNER_TEMP/data"
+          unzip -q "$RUNNER_TEMP/data/name-that-llm.zip" -d "$RUNNER_TEMP/data"
+          uv run --with "kaggle>=2.2.3" python scripts/build_pool.py --download \
+            --root "$RUNNER_TEMP/external" --out "$RUNNER_TEMP/pool.parquet"
+      - name: Retrain, and propose a challenger if it wins
+        env:
+          MLFLOW_TRACKING_URI: ${{ vars.MLFLOW_TRACKING_URI }}
+          MLFLOW_TRACKING_USERNAME: ${{ vars.DAGSHUB_USER }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RETRAIN_PR_TOKEN }}
+        run: >-
+          uv run python scripts/retrain_challenger.py --data-dir "$RUNNER_TEMP/data"
+          --pool "$RUNNER_TEMP/pool.parquet" --out "$RUNNER_TEMP/export"
