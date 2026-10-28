@@ -90,3 +90,9 @@ def test_queries_use_the_labels_seen_on_the_real_stack():
     # app in the stream label service_name (not app_name), next to kind="event".
     exprs = _loki_exprs(DASHBOARD["panels"]) + [r["data"][0]["model"]["expr"] for r in ALERTS]
     assert all('{service_name="name-that-llm-demo", kind="event"}' in e for e in exprs)
+
+
+def test_both_alerts_are_active():
+    # The robot alert started paused (no robot yet). Its events reach Loki now
+    # (2026-10-28), so a silent robot must alert.
+    assert [rule["isPaused"] for rule in ALERTS] == [False, False]

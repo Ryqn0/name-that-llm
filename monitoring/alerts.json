@@ -75,7 +75,7 @@
     "for": "0s",
     "noDataState": "Alerting",
     "execErrState": "Error",
-    "isPaused": true,
+    "isPaused": false,
     "labels": {
       "project": "name-that-llm"
     },

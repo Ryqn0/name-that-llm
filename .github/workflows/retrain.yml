@@ -34,6 +34,9 @@ jobs:
       - name: Download the competition data and build the pool (temporary space only)
         env:
           KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+          # build_pool.py dedupes the pool against our passages: name_that_llm.data finds
+          # them through this variable (the first run failed without it).
+          NTL_DATA_DIR: ${{ runner.temp }}/data
         run: |
           uvx --from "kaggle>=2.2.3" kaggle competitions download name-that-llm -p "$RUNNER_TEMP/data"
           unzip -q "$RUNNER_TEMP/data/name-that-llm.zip" -d "$RUNNER_TEMP/data"

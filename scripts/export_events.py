@@ -63,7 +63,9 @@ def main(argv=None) -> None:
     end_ns = time.time_ns()
     start_ns = end_ns - args.days * 86_400 * 10**9
     auth = (os.environ["GRAFANA_LOGS_USER"], os.environ["GRAFANA_LOGS_TOKEN"])
-    with httpx.Client(base_url=os.environ["GRAFANA_LOGS_URL"].rstrip("/"), auth=auth) as client:
+    url = os.environ["GRAFANA_LOGS_URL"].rstrip("/")
+    # 60 s: a week of events takes Loki longer than httpx's default 5 s (the first run timed out).
+    with httpx.Client(base_url=url, auth=auth, timeout=60) as client:
         pages = fetch(client, start_ns, end_ns)
     events = pd.concat([parse_loki(page) for page in pages], ignore_index=True)
     counts = event_counts(events)
