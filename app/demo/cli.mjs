@@ -7,8 +7,12 @@
 //   node cli.mjs event     {"events": [{"name", "fields"}], "ctx": {...}, "meta": {...}}
 //                          -> {"events": [...], "payload": {...}}, or {"error": "..."}
 //   node cli.mjs send      {"url": "..."}                   -> {"resolved": true}
+// And for tests/test_feedback.py, the "Do you know who wrote it?" answer (feedback.js):
+//   node cli.mjs feedback  {"results": [...], "steps": [[i, choice], ...], "labels": [...]}
+//                          -> {"fields": [fields or null, one per step]}
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { answer as answerResult, newResult } from "./feedback.js";
 import { flatten, loadModel, predictProba, textStats, unusualReasons } from "./ntl.js";
 import { makeEvent, send, toCollectorPayload } from "./telemetry.js";
 
@@ -36,8 +40,13 @@ if (command === "flatten") {
 } else if (command === "send") {
   await send({ events: [] }, request.url); // never rejects, or this would crash
   answer({ resolved: true });
+} else if (command === "feedback") {
+  const results = request.results.map(newResult);
+  const steps = request.steps.map(([i, choice]) => answerResult(results[i], choice, request.labels));
+  answer({ fields: steps });
 } else {
-  console.error(`unknown command: ${command} (expected flatten, predict, stats, event or send)`);
+  const known = "flatten, predict, stats, event, send or feedback";
+  console.error(`unknown command: ${command} (expected ${known})`);
   process.exit(2);
 }
 

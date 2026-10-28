@@ -33,7 +33,7 @@ def _touch(path: Path, text: str = "x") -> None:
 
 def test_stage_space_copies_only_the_demo_files(deploy, tmp_path):
     repo, model = tmp_path / "repo", tmp_path / "model"
-    for name in ["index.html", "ntl.js", "telemetry.js", "cli.mjs", "package.json"]:
+    for name in ["index.html", "ntl.js", "telemetry.js", "feedback.js", "cli.mjs", "package.json"]:
         _touch(repo / "app" / "demo" / name)
     _touch(repo / "app" / "demo" / "README.md", "the demo's model card")
     _touch(repo / "app" / "demo" / "MODEL_RUN", "run123\r\n")  # as Python writes it on Windows
@@ -54,6 +54,7 @@ def test_stage_space_copies_only_the_demo_files(deploy, tmp_path):
     assert sorted(p.as_posix() for p in staged) == [
         "README.md",  # app/demo/README.md: the Space's model card
         "config.json",  # the page's settings: the collector's address (P6)
+        "feedback.js",
         "index.html",
         "model.json",
         "ntl.js",
@@ -68,7 +69,7 @@ def test_stage_space_copies_only_the_demo_files(deploy, tmp_path):
 
 def _demo(repo: Path, challenger_run: str) -> None:
     """The demo's folder: its page files, and the two pins."""
-    for name in ["index.html", "ntl.js", "telemetry.js", "README.md"]:
+    for name in ["index.html", "ntl.js", "telemetry.js", "feedback.js", "README.md"]:
         _touch(repo / "app" / "demo" / name)
     _touch(repo / "app" / "demo" / "MODEL_RUN", "run123\n")
     _touch(repo / "app" / "demo" / "CHALLENGER_RUN", challenger_run)
