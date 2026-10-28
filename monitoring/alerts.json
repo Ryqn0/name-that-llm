@@ -1,0 +1,138 @@
+[
+  {
+    "uid": "ntl-errors",
+    "title": "Demo: more than 5 real errors in an hour",
+    "ruleGroup": "name-that-llm",
+    "condition": "C",
+    "for": "0s",
+    "noDataState": "OK",
+    "execErrState": "Error",
+    "isPaused": false,
+    "labels": {
+      "project": "name-that-llm"
+    },
+    "annotations": {
+      "summary": "The public demo reported more than 5 errors from real visitors in the last hour."
+    },
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "${LOKI_UID}",
+        "relativeTimeRange": {
+          "from": 3600,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "sum(count_over_time({app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"error\" | event_data_synthetic=\"false\" [1h]))",
+          "queryType": "instant"
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "gt",
+                "params": [
+                  5
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "uid": "ntl-robot-silent",
+    "title": "Demo: the robot visitor got no answer for 12 hours",
+    "ruleGroup": "name-that-llm",
+    "condition": "C",
+    "for": "0s",
+    "noDataState": "Alerting",
+    "execErrState": "Error",
+    "isPaused": true,
+    "labels": {
+      "project": "name-that-llm"
+    },
+    "annotations": {
+      "summary": "The robot visitor (every 6 hours) got no answer from the live demo for 12 hours: the site may be down, or the robot broken."
+    },
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "${LOKI_UID}",
+        "relativeTimeRange": {
+          "from": 43200,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "sum(count_over_time({app_name=\"name-that-llm-demo\", kind=\"event\"} | logfmt | event_name=\"answer\" | event_data_synthetic=\"true\" [12h]))",
+          "queryType": "instant"
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "lt",
+                "params": [
+                  1
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+]
