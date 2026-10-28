@@ -47,7 +47,9 @@ export function loadModel(json, weights) {
   for (const block of [words, chars]) {
     block.index = new Map(block.vocabulary.map((term, i) => [term, i]));
   }
-  return { ...json, words, chars, n, k, coef, intercept };
+  // The single words the model knows (its vocabulary minus the bigrams): textStats' basis.
+  const unigrams = new Set(words.vocabulary.filter((term) => !term.includes(" ")));
+  return { ...json, words, chars, n, k, coef, intercept, unigrams };
 }
 
 // Python's (?u)\b\w\w+\b: maximal runs of word characters (letters, digits, underscore),
@@ -124,4 +126,40 @@ export function describeConfidence(top, bands) {
 export function countWords(text) {
   const flat = flatten(text);
   return flat ? flat.split(" ").length : 0;
+}
+
+// ---------- unusual texts (P6, I-025) ----------
+// A text unlike the training passages gets a note on the page, since the model's answer
+// deserves less trust there. The limits were measured on our own passages
+// (name_that_llm.browser.unusual_thresholds) and are shipped in model.meta.unusual.
+const LETTER = /\p{L}/u;
+const LATIN = /\p{Script=Latin}/u;
+
+// {words, unknown_share, non_latin_share} for one text, flattened first like predictProba.
+// unknown_share is the share of its single words outside the model's vocabulary
+// (browser.unknown_share in Python computes the same number).
+export function textStats(model, text) {
+  const flat = flatten(text);
+  const tokens = wordTerms(flat, { ...model.words, ngram_range: [1, 1] });
+  const unknown = tokens.filter((token) => !model.unigrams.has(token)).length;
+  const letters = [...flat].filter((c) => LETTER.test(c));
+  const latin = letters.filter((c) => LATIN.test(c)).length;
+  return {
+    words: flat ? flat.split(" ").length : 0,
+    unknown_share: tokens.length ? unknown / tokens.length : 0,
+    non_latin_share: letters.length ? (letters.length - latin) / letters.length : 0,
+  };
+}
+
+// Why a text looks unusual: any of "short", "unknown_words" and "non_latin", or none.
+// Without limits in the model's meta (an older export), nothing is flagged.
+export function unusualReasons(model, text) {
+  const limits = model.meta?.unusual;
+  if (!limits) return [];
+  const stats = textStats(model, text);
+  const reasons = [];
+  if (stats.words < limits.min_words) reasons.push("short");
+  if (stats.unknown_share > limits.max_unknown_share) reasons.push("unknown_words");
+  if (stats.non_latin_share > limits.max_non_latin_share) reasons.push("non_latin");
+  return reasons;
 }

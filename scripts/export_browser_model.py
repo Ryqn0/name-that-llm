@@ -6,7 +6,9 @@ browser. Run by hand, once per new demo model. In order, it:
      folder register_champion.py logged as name-that-llm version 1;
   2. measures lr's OWN "How sure?" bands on out-of-fold predictions (seed 42): alone, lr
      is less sure than the champion, so the champion's thresholds would mislabel it;
-  3. exports model.json and weights.bin for the browser engine (name_that_llm.browser);
+  3. exports model.json and weights.bin for the browser engine (name_that_llm.browser),
+     with the page's limits for an "unusual" text in meta (P6, I-025), measured on
+     held-out passages (browser.unusual_thresholds);
   4. checks PARITY on 50 training passages: the JavaScript engine, run by Node, against
      scikit-learn. The same top label on all 50 and probabilities within 1e-5, or it stops;
   5. unless --dry-run, logs the folder as an MLflow run (experiment "browser-demo") and
@@ -29,7 +31,7 @@ import mlflow
 import numpy as np
 
 from name_that_llm import __version__
-from name_that_llm.browser import DEMO_DIR, export_browser_model, run_engine
+from name_that_llm.browser import DEMO_DIR, export_browser_model, run_engine, unusual_thresholds
 from name_that_llm.champion import fit_confidence_bands
 from name_that_llm.config import load_config
 from name_that_llm.data import flatten_text, load_train
@@ -68,8 +70,16 @@ def main(argv=None) -> None:
         print("   WARNING: a more confident band is not more often right")
 
     print("3. export for the browser engine", flush=True)
-    # The page reads cv_balanced_accuracy for its "right about N times in 10".
+    # The page reads cv_balanced_accuracy for its "right about N times in 10", and
+    # `unusual` for its note on texts unlike our passages (P6).
+    unusual = unusual_thresholds(load_config("lr").model_copy(update={"seed": 42}), train)
+    print(
+        f"   unusual if under {unusual['min_words']} words, over "
+        f"{unusual['max_unknown_share']:.1%} unknown words (1% of held-out passages are), "
+        f"or over {unusual['max_non_latin_share']:.0%} non-Latin letters"
+    )
     meta = {"source": SOURCE, "cv_balanced_accuracy": cv.score, "package_version": __version__}
+    meta["unusual"] = unusual
     for path in export_browser_model(text_model, bands, args.out, meta):
         print(f"   {path} ({path.stat().st_size / 1e6:.1f} MB)")
 
@@ -84,6 +94,10 @@ def main(argv=None) -> None:
     print(f"   same top label: {agree} of {len(rows)} | max probability difference {diff:.1e}")
     if agree < len(rows) or diff > 1e-5:
         sys.exit("STOP: the browser engine disagrees with scikit-learn")
+    # The same passages through the page's checks. These are training passages, whose words
+    # this model knows, so hardly any should be flagged.
+    reasons = run_engine("stats", {"model": str(args.out), "texts": sample})["reasons"]
+    print(f"   flagged as unusual: {sum(map(bool, reasons))} of {len(rows)} training passages")
 
     if args.dry_run:
         print("dry run: every check passed; nothing was logged")
@@ -93,6 +107,7 @@ def main(argv=None) -> None:
     with mlflow.start_run(run_name="export-browser-model") as run:
         mlflow.log_params({"source": SOURCE, "parity_rows": len(rows)})
         mlflow.log_metrics({"cv_balanced_accuracy": cv.score, "parity_max_diff": diff})
+        mlflow.log_metrics({f"unusual_{key}": value for key, value in unusual.items()})
         mlflow.log_artifacts(str(args.out))
     (DEMO_DIR / "MODEL_RUN").write_text(f"{run.info.run_id}\n", encoding="utf-8")
     print(f"   run {run.info.run_id} logged; app/demo/MODEL_RUN pins it")

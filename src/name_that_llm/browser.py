@@ -23,9 +23,16 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
+from sklearn.base import clone
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from name_that_llm.champion import Band
+from name_that_llm.config import ExperimentConfig
+from name_that_llm.cv import make_folds
+from name_that_llm.data import flatten_text
 from name_that_llm.labels import LAB_NAMES, LAB_OF, LABELS
+from name_that_llm.models import build_model
 
 # The demo's folder in the repo: the engine (ntl.js), its Node harness (cli.mjs), the page,
 # and MODEL_RUN. Only checks run from the repo use it: an installed wheel has no app/.
@@ -100,6 +107,51 @@ def _check(union, vectorizers: dict, clf) -> None:
                 )
     if list(clf.classes_) != LABELS or clf.coef_.shape[0] != len(LABELS):
         raise ValueError("expected a multinomial logistic regression over the 18 LABELS")
+
+
+def unknown_share(texts: Sequence[str], vocabulary: set[str]) -> np.ndarray:
+    """The share of each text's words that `vocabulary` doesn't know (P6, I-025).
+
+    Words as `lr`'s word analyzer sees them, unigrams only: the text flattened (as the page
+    does), lowercased, then runs of 2 or more word characters. ntl.js's textStats computes
+    the same number. A text with no word at all scores 0: it's flagged as short instead.
+    """
+    analyze = TfidfVectorizer(**_EXPECTED["words"], ngram_range=(1, 1)).build_analyzer()
+    out = np.zeros(len(texts))
+    for i, text in enumerate(texts):
+        tokens = analyze(flatten_text(str(text)))
+        if tokens:
+            out[i] = sum(token not in vocabulary for token in tokens) / len(tokens)
+    return out
+
+
+def unusual_thresholds(cfg: ExperimentConfig, df: pd.DataFrame, quantile: float = 0.99) -> dict:
+    """The demo's limits for an "unusual" text, measured on our own passages (P6, I-025).
+
+      - min_words: the shortest training passage, in words after flattening (as the page
+        counts them);
+      - max_unknown_share: the `quantile` of HELD-OUT unknown-word shares. Each passage is
+        measured against the vocabulary of its fold's training rows only, the way a
+        visitor's text meets a model that never saw it. Against the full vocabulary, every
+        training word would be known, and the limit would be 0;
+      - max_non_latin_share: 0.2, a fixed rule, since our passages are English.
+
+    With quantile 0.99, about 1% of our own held-out passages exceed max_unknown_share.
+    """
+    texts = df["text"].astype(str).tolist()
+    folds = make_folds(df, cfg.n_splits, cfg.seed).to_numpy()
+    words = dict(build_model(cfg).named_steps["features"].transformer_list)["words"]
+    shares = np.zeros(len(texts))
+    for k in np.unique(folds):
+        fitted = clone(words).fit([texts[i] for i in np.flatnonzero(folds != k)])
+        vocabulary = {term for term in fitted.vocabulary_ if " " not in term}
+        rows = np.flatnonzero(folds == k)
+        shares[rows] = unknown_share([texts[i] for i in rows], vocabulary)
+    return {
+        "min_words": min(len(flatten_text(t).split()) for t in texts),
+        "max_unknown_share": float(np.quantile(shares, quantile)),
+        "max_non_latin_share": 0.2,
+    }
 
 
 def run_engine(command: str, payload: dict) -> dict:
