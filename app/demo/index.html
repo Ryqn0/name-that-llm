@@ -198,13 +198,16 @@
       $("status").textContent = "Done in " + (answerMs / 1000).toFixed(2) + " s, on your device.";
       const reasons = unusualReasons(model, text);
       $("unusual").hidden = reasons.length === 0;
-      // Shadow mode: once loaded, the challenger scores the same text silently.
-      const challengerLabel = challenger ? rank(challenger, predictProba(challenger, text))[0].model : null;
-      current = newResult({ label: ranking[0].model, challenger_label: challengerLabel, band: band.label });
+      current = newResult({ label: ranking[0].model, challenger_label: null, band: band.label });
       currentText = text;
       resetFeedback();
-      report("answer", { answer_ms: answerMs, words, label: ranking[0].model, band: band.label,
-                         challenger_label: challengerLabel, unusual: reasons }, text);
+      const fields = { answer_ms: answerMs, words, label: ranking[0].model, band: band.label,
+                       unusual: reasons };
+      // Shadow mode: the challenger scores the same text only AFTER the answer is on screen
+      // (the next task, once the browser has painted), and in its own try: it can never
+      // delay or break what the visitor sees. The answer event leaves from there.
+      const result = current;
+      setTimeout(() => scoreWithChallenger(result, text, fields), 0);
       loadChallenger();  // after the first answer only, so it never slows that one down
     } catch (error) {
       console.error(error);
@@ -249,10 +252,31 @@
     try { return await fetch(path).then(ok).then((r) => r.json()); } catch { return fallback; }
   }
 
+  // The challenger's label for `text`, recorded on `result` (so the visitor's answer judges
+  // both models), then the answer event, with the challenger's own time. Never throws.
+  function scoreWithChallenger(result, text, fields) {
+    let label = null, ms;
+    if (challenger) {
+      try {
+        const start = performance.now();
+        label = rank(challenger, predictProba(challenger, text))[0].model;
+        ms = performance.now() - start;
+        result.challenger_label = label;
+      } catch (error) {
+        reportError("answer", error, text);
+      }
+    }
+    report("answer", { ...fields, challenger_label: label, challenger_ms: ms }, text);
+  }
+
   // Shadow mode (P6): the challenger pinned in version.json loads after the first answer.
-  // One attempt per visit; a failure is reported and changes nothing for the visitor.
+  // It's about 35 MB, so a visitor who asked their browser to save data, or who is on a slow
+  // connection, never downloads it. One attempt per visit; a failure is reported and
+  // changes nothing for the visitor.
   async function loadChallenger() {
-    if (challengerTried || !version.challenger_run) return;
+    const connection = navigator.connection;
+    const slow = connection?.saveData || ["slow-2g", "2g"].includes(connection?.effectiveType);
+    if (challengerTried || !version.challenger_run || slow) return;
     challengerTried = true;
     const start = performance.now();
     try {
@@ -262,6 +286,16 @@
       ]);
       challenger = loadModel(json, weights);
       report("page_load", { load_ms: performance.now() - start, ok: true, what: "challenger" });
+      // The text on screen hasn't been scored by the challenger yet (it loaded after that
+      // answer): score it now, so a "Do you know who wrote it?" answer to it judges both.
+      // No second answer event: that text was already counted.
+      if (current && !current.answered) {
+        try {
+          current.challenger_label = rank(challenger, predictProba(challenger, currentText))[0].model;
+        } catch (error) {
+          reportError("answer", error, currentText);
+        }
+      }
     } catch (error) {
       report("page_load", { load_ms: performance.now() - start, ok: false, what: "challenger" });
       reportError("load", error);
