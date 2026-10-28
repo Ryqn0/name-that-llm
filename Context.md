@@ -290,8 +290,10 @@ on the branch `p7-i029-pool-ensemble`, which is pushed but not merged.
 1. **I-029: does the pool help the ensemble, through its `lr` member?**
    - Read `data/runs/i029-pool-ensemble.log`. Its last line is the verdict: PROMOTE if the
      seed-42 bootstrap's lower bound is above 0.
-   - If the log is cut short, the PC slept or restarted: re-run
-     `python -I -X utf8 scripts/pool_ensemble_check.py`. It takes about an hour on CPU.
+   - If the log is cut short, the PC shut down or restarted: re-run
+     `python -I -X utf8 scripts/pool_ensemble_check.py`. It takes about 3¼ hours on CPU,
+     about 50 minutes a seed: the weekly retraining's `lr` plus the pool took 47 minutes
+     on GitHub.
    - **If PROMOTE:** it's a submission candidate that needs no GPU (the user's OK), and it
      becomes Task 7's `lr` member. Record the numbers in IDEAS I-029 either way, then ship
      the branch.
