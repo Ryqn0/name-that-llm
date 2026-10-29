@@ -47,6 +47,26 @@ def fake_kaggle_input(root: Path, tiny_qwen: Path, train) -> None:
     np.save(encoder / "oof-encoder-seed7.npy", p / p.sum(axis=1, keepdims=True))
 
 
+def fake_open_pool(root: Path) -> None:
+    """The public pool dataset under /kaggle/input: 36 passages from two of the kept sources."""
+    import pandas as pd
+
+    from name_that_llm.labels import LABELS
+
+    pool = root / "name-that-llm-open-pool"
+    pool.mkdir()
+    kept = ["drjcfmd/ntl-generated-v2", "ayhampar/ntl-pool-ft"]
+    rows = [
+        {
+            "text": f"pooltopic{i} " + f"marker{i % 18} words about things here " * 7,
+            "model": LABELS[i % 18],
+            "source_dataset": kept[i % 2],
+        }
+        for i in range(36)
+    ]
+    pd.DataFrame(rows).to_parquet(pool / "ntl_open_pool.parquet")
+
+
 def test_llm_first_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_path, monkeypatch):
     pytest.importorskip("peft")
     fake_kaggle_input(tmp_path / "input", tiny_qwen, fake_train)
@@ -79,7 +99,6 @@ def test_llm_explore_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_pat
     import pandas as pd
 
     from name_that_llm.config import LLMConfig
-    from name_that_llm.labels import LABELS
 
     inp = tmp_path / "input"
     fake_kaggle_input(inp, tiny_qwen, fake_train)
@@ -88,18 +107,7 @@ def test_llm_explore_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_pat
     first.mkdir()
     p = rng.random((len(fake_train), 18))
     np.save(first / "oof-llm-seed7.npy", p / p.sum(axis=1, keepdims=True))
-    pool = inp / "name-that-llm-open-pool"  # the public pool, two of the kept sources
-    pool.mkdir()
-    kept = ["drjcfmd/ntl-generated-v2", "ayhampar/ntl-pool-ft"]
-    rows = [
-        {
-            "text": f"pooltopic{i} " + f"marker{i % 18} words about things here " * 7,
-            "model": LABELS[i % 18],
-            "source_dataset": kept[i % 2],
-        }
-        for i in range(36)
-    ]
-    pd.DataFrame(rows).to_parquet(pool / "ntl_open_pool.parquet")
+    fake_open_pool(inp)
     work = tmp_path / "working"
     work.mkdir()
     config = tmp_path / "llm.yaml"
@@ -121,3 +129,41 @@ def test_llm_explore_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_pat
     assert results["mean"].between(0, 1).all()
     chosen = LLMConfig(**yaml.safe_load((work / "llm-chosen.yaml").read_text(encoding="utf-8")))
     assert chosen.seed == 7 and chosen.pool_size in (0, 5000, 15000)
+
+
+def test_llm_final_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_path, monkeypatch):
+    # Notebook 12's first session (P7 Task 7): the pooled LLM at 1 epoch on seed-7 folds 0
+    # and 1, against notebook 11's 2-epoch run on the same folds. Within 0.005, the cheaper
+    # 1 epoch wins, and every later run costs half.
+    pytest.importorskip("peft")
+    import pandas as pd
+
+    inp = tmp_path / "input"
+    fake_kaggle_input(inp, tiny_qwen, fake_train)
+    fake_open_pool(inp)
+    explore = inp / "name-that-llm-llm-explore"  # notebook 11's output: its results table
+    explore.mkdir()
+    pd.DataFrame(
+        [{"name": "pool5000", "pool_size": 5000, "fold0": 0.47, "fold1": 0.41, "mean": 0.44}]
+    ).to_csv(explore / "results.csv", index=False)
+    work = tmp_path / "working"
+    work.mkdir()
+    config = tmp_path / "llm.yaml"
+    tiny = dict(name="llm", base_model="unused", load_in_4bit=False, n_layers=4, lora_r=4)
+    tiny |= dict(lora_alpha=8, max_length=64, batch_size=8, lr=5e-3, epochs=2, pool_size=20)
+    config.write_text(yaml.safe_dump(tiny), encoding="utf-8")
+    env = {
+        "NTL_INPUT": str(inp),
+        "NTL_WORK": str(work),
+        "NTL_LLM_CONFIG": str(config),
+        "NTL_DATA_DIR": str(fake_data_dir),
+    }
+    run_notebook(NOTEBOOKS / "12-llm-final" / "llm_final.ipynb", env, monkeypatch)
+
+    results = pd.read_csv(work / "results.csv")
+    assert list(results["name"]) == ["ep1-seed7"]
+    assert results[["fold0", "fold1", "mean"]].stack().between(0, 1).all()
+    summary = json.loads((work / "results.json").read_text())
+    assert summary["reference"]["mean"] == 0.44  # notebook 11's pool5000, the same folds
+    assert summary["chosen_epochs"] in (1, 2)
+    assert np.load(work / "runs" / "ep1-seed7" / "fold0.npz")["fold0"].shape[1] == 18
