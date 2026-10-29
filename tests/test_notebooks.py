@@ -47,6 +47,26 @@ def fake_kaggle_input(root: Path, tiny_qwen: Path, train) -> None:
     np.save(encoder / "oof-encoder-seed7.npy", p / p.sum(axis=1, keepdims=True))
 
 
+def fake_open_pool(root: Path) -> None:
+    """The public pool dataset under /kaggle/input: 36 passages from two of the kept sources."""
+    import pandas as pd
+
+    from name_that_llm.labels import LABELS
+
+    pool = root / "name-that-llm-open-pool"
+    pool.mkdir()
+    kept = ["drjcfmd/ntl-generated-v2", "ayhampar/ntl-pool-ft"]
+    rows = [
+        {
+            "text": f"pooltopic{i} " + f"marker{i % 18} words about things here " * 7,
+            "model": LABELS[i % 18],
+            "source_dataset": kept[i % 2],
+        }
+        for i in range(36)
+    ]
+    pd.DataFrame(rows).to_parquet(pool / "ntl_open_pool.parquet")
+
+
 def test_llm_first_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_path, monkeypatch):
     pytest.importorskip("peft")
     fake_kaggle_input(tmp_path / "input", tiny_qwen, fake_train)
@@ -79,7 +99,6 @@ def test_llm_explore_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_pat
     import pandas as pd
 
     from name_that_llm.config import LLMConfig
-    from name_that_llm.labels import LABELS
 
     inp = tmp_path / "input"
     fake_kaggle_input(inp, tiny_qwen, fake_train)
@@ -88,18 +107,7 @@ def test_llm_explore_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_pat
     first.mkdir()
     p = rng.random((len(fake_train), 18))
     np.save(first / "oof-llm-seed7.npy", p / p.sum(axis=1, keepdims=True))
-    pool = inp / "name-that-llm-open-pool"  # the public pool, two of the kept sources
-    pool.mkdir()
-    kept = ["drjcfmd/ntl-generated-v2", "ayhampar/ntl-pool-ft"]
-    rows = [
-        {
-            "text": f"pooltopic{i} " + f"marker{i % 18} words about things here " * 7,
-            "model": LABELS[i % 18],
-            "source_dataset": kept[i % 2],
-        }
-        for i in range(36)
-    ]
-    pd.DataFrame(rows).to_parquet(pool / "ntl_open_pool.parquet")
+    fake_open_pool(inp)
     work = tmp_path / "working"
     work.mkdir()
     config = tmp_path / "llm.yaml"
@@ -121,3 +129,37 @@ def test_llm_explore_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_pat
     assert results["mean"].between(0, 1).all()
     chosen = LLMConfig(**yaml.safe_load((work / "llm-chosen.yaml").read_text(encoding="utf-8")))
     assert chosen.seed == 7 and chosen.pool_size in (0, 5000, 15000)
+
+
+def test_llm_final_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_path, monkeypatch):
+    # Notebook 12's second session (P7 Task 7). Session 1 showed that 1 epoch loses 0.045, so
+    # the final seed, 42, trains at 2 epochs: folds 0-1, then 2-3, then 4, as many as fit in
+    # the session. Each fold keeps its predictions and its adapter (for the submission).
+    pytest.importorskip("peft")
+    import pandas as pd
+
+    inp = tmp_path / "input"
+    fake_kaggle_input(inp, tiny_qwen, fake_train)
+    fake_open_pool(inp)
+    work = tmp_path / "working"
+    work.mkdir()
+    config = tmp_path / "llm.yaml"
+    tiny = dict(name="llm", base_model="unused", load_in_4bit=False, n_layers=4, lora_r=4)
+    tiny |= dict(lora_alpha=8, max_length=64, batch_size=8, lr=5e-3, epochs=2, pool_size=20)
+    config.write_text(yaml.safe_dump(tiny), encoding="utf-8")
+    env = {
+        "NTL_INPUT": str(inp),
+        "NTL_WORK": str(work),
+        "NTL_LLM_CONFIG": str(config),
+        "NTL_DATA_DIR": str(fake_data_dir),
+    }
+    run_notebook(NOTEBOOKS / "12-llm-final" / "llm_final.ipynb", env, monkeypatch)
+
+    results = pd.read_csv(work / "results.csv")
+    assert list(results["name"]) == ["seed42-f01", "seed42-f23", "seed42-f4"]  # all fit here
+    assert set(results["epochs"]) == {2} and set(results["seed"]) == {42}
+    summary = json.loads((work / "results.json").read_text())
+    assert summary == {"seed": 42, "folds_done": [0, 1, 2, 3, 4], "folds_left": []}
+    for job, k in [("seed42-f01", 0), ("seed42-f01", 1), ("seed42-f23", 3), ("seed42-f4", 4)]:
+        assert np.load(work / "runs" / job / f"fold{k}.npz")[f"fold{k}"].shape[1] == 18
+        assert (work / "adapters" / job / f"fold{k}" / "adapter_config.json").exists()

@@ -233,6 +233,13 @@ CV = the seed-42 folds, the same for every row.
   look at a local page, drive headless Edge with Playwright and answer its requests from
   the folder (`uv run --no-project --with playwright`, `channel="msedge"`), rather than
   serving it.
+- **Sleep pauses long local runs.** An overnight CPU check stood still while the PC slept,
+  and resumed on waking. To check a run, compare its CPU time with its age, not just
+  whether it's alive.
+- **With uv on Windows, the venv's `python.exe` is only a launcher.** The work happens in a
+  child process, `python3.11.exe`: measure that one.
+- **A process started through WMI (`Win32_Process.Create`) survives the end of a Claude
+  session.** Processes started from the session's own shell don't.
 - **Package floors are kept loose on purpose:** Kaggle's preinstalled versions are older,
   and the offline notebook can't upgrade them (see the comment in `pyproject.toml`).
 
@@ -296,19 +303,17 @@ CV = the seed-42 folds, the same for every row.
 ## Next steps
 
 State at the end of session 10 (2026-10-29): **P7 Tasks 1–6 are done, and I-029 is
-promoted.** Task 7's session 2 is running on Kaggle (notebook 12, version 3, pushed 17:32,
-at most 10.5 hours): seed 42 at 2 epochs, as many folds as fit, keeping the adapters. Task
-7's work is on the branch `p7-07-llm-final` (pushed; not merged). The ledger:
-`.superpowers/sdd/2026-10-27-p7-llm-ensemble/progress.md`.
+promoted and ready to submit.** Task 7's session 2 is running on Kaggle (notebook 12,
+version 3, pushed 17:32, at most 10.5 hours): seed 42 at 2 epochs, as many folds as fit,
+keeping the adapters. The ledger: `.superpowers/sdd/2026-10-27-p7-llm-ensemble/progress.md`.
 
-1. **Submit the ensemble with the pool in `lr`** (I-029: CV 0.4705, against 0.4219):
-   - `EnsembleConfig` names the text member's pool size;
-   - `submit.py` fits `lr` on our passages plus 30,000 pool passages;
-   - the submission notebook attaches the open-pool dataset;
-   - a new lib release (the tag needs the user's OK);
-   - then push and submit (the user's OK).
-
-   The submission's own run needs about 30 GPU-minutes.
+1. **Submit I-029's ensemble** (CV 0.4705, against 0.4219; with the usual −0.013 gap,
+   about 0.457 on the LB, against 0.410).
+   - The code (#64) and lib v0.9.0 are ready: `notebooks/90-submit` selects
+     `ensemble_pool`.
+   - Push it, then submit; each needs the user's OK. Its run needs about an hour of GPU.
+   - Do it once session 2 has ended, so the quota left is known (the user had 11+ hours
+     before session 2).
 2. **Session 2's results:**
    - download them: `kaggle kernels output ryqn00/name-that-llm-llm-final -p
      data/kaggle-outputs/llm-final-s2`;
