@@ -146,3 +146,52 @@ def test_an_empty_week_gives_zeros():
         )
     )
     assert event_counts(busy) == {"events": 4} | zeros | {"real_visits": 1, "real_feedback": 1}
+
+
+def test_parse_loki_survives_junk_values():
+    # The final review's finding C: anyone can send events to the public collector, and one
+    # junk value must not sink a week's export. An apostrophe broke the old parser (shlex).
+    junk = "kind=event event_name=error event_data_kind=can't event_data_synthetic=false "
+    junk += r'event_data_message="a \"quoted\" path C:\\x" app_version=abc'  # Go-escaped
+    events = parse_loki(_response(junk))
+    assert events.loc[0, "kind"] == "can't"
+    assert events.loc[0, "message"] == r'a "quoted" path C:\x'
+
+
+def test_a_window_without_the_synthetic_field_gives_zeros():
+    # Junk events may lack fields our page always sends: nothing may crash on them.
+    events = parse_loki(_response(_line("feedback", actual=A, label=A)))  # no synthetic
+    assert event_counts(events)["real_feedback"] == 0
+    assert live_accuracy(events).empty
+    assert paired(events) == {"n": 0, "champion_only": 0, "challenger_only": 0}
+
+
+def _export_module():
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "scripts" / "export_events.py"
+    spec = importlib.util.spec_from_file_location("export_events_module", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_export_weeks_are_fixed_monday_windows():
+    # The final review's finding 5: a window that ends "now" leaves gaps (or overlaps) when
+    # a run is late, repeated or missed, and Loki forgets after about two weeks. Weeks are
+    # fixed: Monday 00:00 UTC to the next Monday.
+    from datetime import UTC, datetime
+
+    module = _export_module()
+    wednesday = datetime(2026, 11, 4, 10, 30, tzinfo=UTC)
+    start, end = module.week_window(wednesday)
+    assert (start, end) == (datetime(2026, 10, 26, tzinfo=UTC), datetime(2026, 11, 2, tzinfo=UTC))
+    start, end = module.week_window(wednesday, end="2026-10-26")  # redo a missed week
+    assert (start, end) == (datetime(2026, 10, 19, tzinfo=UTC), datetime(2026, 10, 26, tzinfo=UTC))
+
+
+def test_metric_names_are_safe_whatever_the_run_id():
+    # A junk model_run (from a fake event) must not make the MLflow run fail.
+    module = _export_module()
+    assert module.metric_name("champion", "run/../x y!") == "champion_run_.._x_y_"

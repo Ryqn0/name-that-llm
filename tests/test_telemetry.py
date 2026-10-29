@@ -111,3 +111,23 @@ def test_every_request_gets_a_fresh_random_session_id():
     ids = [request["headers"]["X-Faro-Session-Id"] for request in sent["requests"]]
     assert len(ids) == 2 and ids[0] != ids[1] and all(len(i) >= 16 for i in ids)
     assert all(request["keepalive"] for request in sent["requests"])
+
+
+def test_answer_events_carry_the_challengers_own_time():
+    # The final review's finding 6: the challenger now scores after the answer is shown, and
+    # its time is a field of its own, so the dashboard can see what shadow mode costs.
+    fields = {"answer_ms": 9.6, "challenger_ms": 3.4, "challenger_label": LABELS[2]}
+    (event,) = make([{"name": "answer", "fields": fields}])["events"]
+    assert event["fields"] == {"answer_ms": 10, "challenger_ms": 3, "challenger_label": LABELS[2]}
+
+
+def test_redaction_sees_through_unicode_forms():
+    # The final review's finding B: a passage pasted in decomposed form (NFD), quoted by an
+    # error in composed form (NFC), must still be caught.
+    import unicodedata
+
+    text = unicodedata.normalize("NFD", "Café crème brûlée, served at the château.")
+    message = unicodedata.normalize("NFC", "failed on: crème brûlée")
+    fields = {"where": "answer", "kind": "Error", "message": message}
+    (event,) = make([{"name": "error", "fields": fields}], text=text)["events"]
+    assert event["fields"]["message"] == "[redacted]"

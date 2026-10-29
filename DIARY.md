@@ -2,6 +2,56 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-10-28 · Session 9: the site watched, the models compared live, and the first LLM run
+
+**Did**
+- **P6, start to finish:**
+  - the demo page now sends anonymous events to your Grafana Cloud stack: loads, answers,
+    errors, and the optional "Do you know who wrote it?" answer;
+  - a dashboard and two email alerts, as code;
+  - a robot visitor every 6 hours;
+  - a weekly export of the events to DagsHub;
+  - a weekly retraining. Its first run proposed `lr` + the pool (CV 0.4186) as the demo's
+    challenger, and with your OK it now scores visitors' texts in shadow mode.
+- **You set up Grafana Cloud** (stack, collector, tokens, email, Infinity), guided step by
+  step. Then you visited the demo, and your visit showed on the dashboard.
+- **P6's final review** by a fresh reviewer: nothing critical, 6 important findings. All
+  were fixed in #60, each with a test that failed first:
+  - the retraining won't re-propose an equally good model every week;
+  - the challenger can't slow or break the visitor's answer;
+  - the live panels compare the two models on the same texts.
+- **P7 Task 5:** the first Qwen3-8B run on Kaggle's two T4s. The first try ran out of
+  memory, which was fixed, and the second ran for 4 hours.
+- **P7 Task 6 started:** notebook 11 explores depth, length and the pool for the LLM.
+
+**Learned**
+- **Test against the real service before building on its docs.** One synthetic test event
+  showed that Grafana's collector requires a session header and an SDK name, and that Loki
+  names the app `service_name`, all before the dashboard was pushed.
+- **When something "shows nothing", check each link of the chain.** Your visit was in Loki
+  all along. The dashboard's data source picker had defaulted to the wrong Loki, of three.
+- **Kaggle doesn't give secrets to runs pushed through its API**, which is why W&B never
+  worked in our GPU notebooks. Their results will be logged from the PC instead.
+- **A freed model can stay on the GPU** inside a long-lived process. Running every GPU step
+  in a process of its own returns its memory for sure.
+- **A first scheduled run is a test of its own.** Both weekly jobs failed their first GitHub
+  run, for reasons a local run couldn't show.
+- **Look at the rendered panel.** Thirteen tests passed and Loki accepted every query, yet
+  two panels showed unnamed numbers. Rendering them as images showed it at once.
+
+**Scores** (seed-7 out-of-fold, balanced accuracy)
+
+| model | CV |
+|---|---|
+| **Qwen3-8B + LoRA, alone** (pool-free) | 0.3641 |
+| ModernBERT encoder | 0.3590 |
+| current ensemble (3 members) | 0.4293 |
+| **ensemble + the LLM** (in-sample weights) | **0.4523** |
+
+**Next**
+- Notebook 11's results: the LLM's depth, length, and above all whether the pool helps it.
+- P7 Task 7: the final LLM run, the four-member ensemble, and the A/B gate on fresh seeds.
+
 ## 2026-10-27 · Session 8: P7 begins with generated data, and P6 is planned
 
 **Did**

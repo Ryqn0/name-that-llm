@@ -28,6 +28,7 @@ const SPECS = {
     label: "label",
     band: "band",
     challenger_label: "label or null",
+    challenger_ms: "number", // shadow mode's own cost, measured apart from the answer's
     unusual: "unusual",
   },
   feedback: { actual: "actual", label: "label", challenger_label: "label or null", band: "band" },
@@ -77,10 +78,13 @@ function check(type, value, ctx) {
 
 // True if `value` holds a run of 4+ letters that also occurs anywhere in `text`. Runs are
 // looked up as substrings of the text, so a word cut at the field's maximum length, or a
-// fragment of a script written without spaces, is still caught.
+// fragment of a script written without spaces, is still caught. Both sides are brought to
+// one Unicode form first (NFKC): "é" can be one character or "e" plus an accent, and a
+// passage pasted in one form may be quoted in the other.
 function leaks(value, text) {
-  const haystack = text.toLowerCase();
-  return (value.toLowerCase().match(LETTERS) ?? []).some((run) => haystack.includes(run));
+  const haystack = text.normalize("NFKC").toLowerCase();
+  const runs = value.normalize("NFKC").toLowerCase().match(LETTERS) ?? [];
+  return runs.some((run) => haystack.includes(run));
 }
 
 // The collector's JSON (Grafana Faro): each event with string attributes, which are its

@@ -16,9 +16,10 @@ Usage:  python scripts/export_events.py [--days 7]
 
 import argparse
 import os
+import re
 import sys
 import tempfile
-import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -48,20 +49,44 @@ def fetch(client, start_ns: int, end_ns: int, limit: int = LIMIT) -> list[dict]:
         start_ns = max(stamps) + 1
 
 
+def week_window(now: datetime, end: str | None = None, days: int = 7) -> tuple[datetime, datetime]:
+    """The week to export: (start, end), both at 00:00 UTC, end a Monday by default.
+
+    Fixed weeks, not "the last 7 days from now": a late, repeated or failed run would
+    otherwise leave a gap, or count events twice, and Loki forgets after about two weeks (the
+    final review's finding 5). `end` (YYYY-MM-DD) redoes a given week; by default, the latest
+    Monday 00:00 UTC at or before `now`.
+    """
+    if end is not None:
+        stop = datetime.strptime(end, "%Y-%m-%d").replace(tzinfo=UTC)
+    else:
+        today = now.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        stop = today - timedelta(days=today.weekday())  # Monday is weekday 0
+    return stop - timedelta(days=days), stop
+
+
+def metric_name(role: str, run: str) -> str:
+    """An MLflow metric name for one model run, safe whatever the run id: a fake event on
+    the public collector can carry any text, and MLflow refuses some characters."""
+    return re.sub(r"[^0-9A-Za-z_.-]", "_", f"{role}_{run}")[:200]
+
+
 def main(argv=None) -> None:
     import httpx
     import mlflow
 
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--days", type=int, default=7)
+    parser.add_argument("--days", type=int, default=7, help="the window's length")
+    parser.add_argument("--end", help="redo the week ending on this date (YYYY-MM-DD, 00:00 UTC)")
     args = parser.parse_args(argv)
     keys = ("GRAFANA_LOGS_URL", "GRAFANA_LOGS_USER", "GRAFANA_LOGS_TOKEN", "MLFLOW_TRACKING_URI")
     missing = [key for key in keys if not os.environ.get(key)]
     if missing:
         sys.exit(f"missing settings: {', '.join(missing)}")
 
-    end_ns = time.time_ns()
-    start_ns = end_ns - args.days * 86_400 * 10**9
+    start, end = week_window(datetime.now(UTC), args.end, args.days)
+    start_ns, end_ns = int(start.timestamp()) * 10**9, int(end.timestamp()) * 10**9
+    print(f"week: {start:%Y-%m-%d} to {end:%Y-%m-%d} (00:00 UTC)")
     auth = (os.environ["GRAFANA_LOGS_USER"], os.environ["GRAFANA_LOGS_TOKEN"])
     url = os.environ["GRAFANA_LOGS_URL"].rstrip("/")
     # 60 s: a week of events takes Loki longer than httpx's default 5 s (the first run timed out).
@@ -81,12 +106,12 @@ def main(argv=None) -> None:
     )
 
     mlflow.set_experiment("live-feedback")
-    day = pd.Timestamp(end_ns, unit="ns").date()
-    with mlflow.start_run(run_name=f"events-to-{day}"), tempfile.TemporaryDirectory() as tmp:
-        mlflow.log_params({"days": args.days, "query": QUERY})
+    name = f"events-{start:%Y-%m-%d}-to-{end:%Y-%m-%d}"
+    with mlflow.start_run(run_name=name), tempfile.TemporaryDirectory() as tmp:
+        mlflow.log_params({"start": f"{start:%Y-%m-%d}", "end": f"{end:%Y-%m-%d}", "query": QUERY})
         mlflow.log_metrics(counts | {f"paired_{key}": value for key, value in pairs.items()})
         for row in accuracy.itertuples():
-            name = f"{row.role}_{row.run}"
+            name = metric_name(row.role, row.run)
             mlflow.log_metrics({f"{name}_n": row.n, f"{name}_accuracy": row.accuracy})
             mlflow.log_metrics({f"{name}_lo": row.lo, f"{name}_hi": row.hi})
         path = Path(tmp) / "events.csv"

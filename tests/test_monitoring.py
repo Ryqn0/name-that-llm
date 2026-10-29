@@ -110,3 +110,72 @@ def test_the_dashboard_opens_on_the_logs_data_source():
         "grafanacloud-s-usage-insights",
     ]
     assert [n for n in names if pattern.search(n)] == ["grafanacloud-s-logs"]
+
+
+LIVE = ("Champion: share right", "Champion vs challenger, on the same texts")
+
+
+def _panel(title_start: str) -> dict:
+    return next(p for p in DASHBOARD["panels"] if p["title"].startswith(title_start))
+
+
+def test_live_accuracy_counts_only_answers_naming_a_model():
+    # The final review's finding 3: "a person" and "another model" answers can't be named by
+    # any model, so they must not count as misses (live.py doesn't count them either).
+    for title in LIVE:
+        for expr in _loki_exprs([_panel(title)]):
+            assert 'event_data_actual!="a person"' in expr
+            assert 'event_data_actual!="another model"' in expr
+
+
+def test_live_numbers_are_per_run_on_the_same_texts_and_show_n():
+    # Champion and challenger side by side must be on the SAME texts (those the challenger
+    # scored), per model run (a promotion mustn't mix two models), with the count shown.
+    champion = _loki_exprs([_panel(LIVE[0])])
+    assert len(champion) == 2 and all("by (event_data_model_run)" in e for e in champion)
+    compared = _loki_exprs([_panel(LIVE[1])])
+    assert len(compared) == 3
+    assert all('event_data_challenger_label!=""' in e for e in compared)
+    assert all("by (event_data_challenger_run)" in e for e in compared)
+
+
+def test_no_panel_depends_on_an_x_field():
+    # The final review's finding 4: instant queries grouped by a label return one frame per
+    # value, which a bar chart's x field can't find. Bar gauges draw one bar per series.
+    assert not [p["title"] for p in DASHBOARD["panels"] if p["type"] == "barchart"]
+
+
+def test_unwrapped_values_drop_parse_errors():
+    # A non-numeric value (a fake event on the public collector) would make Loki refuse the
+    # whole query: such lines are dropped first.
+    for expr in _loki_exprs(DASHBOARD["panels"]):
+        if "unwrap" in expr:
+            assert '__error__=""' in expr
+
+
+def test_a_model_with_no_right_answer_shows_zero():
+    # A count with no matching line returns no series at all, so "0 right" would show as a
+    # blank: every "right" count is completed with "or 0 * <all answers>".
+    exprs = _loki_exprs([_panel(LIVE[0]), _panel(LIVE[1])])
+    assert all(" or 0 * " in e for e in exprs if "right" in e and "label_format" in e)
+
+
+def test_counts_are_range_queries_reduced_to_their_last_value():
+    # Rendered on the real stack (2026-10-28): Grafana shows a Loki INSTANT query as one table
+    # that a stat or bar gauge reduces to a single unnamed number. Range queries give one
+    # series per value, named by its legend; the last point is the count over the time range.
+    for panel in DASHBOARD["panels"]:
+        if panel["type"] in ("stat", "bargauge"):
+            assert all(t["queryType"] == "range" for t in panel["targets"]), panel["title"]
+            assert panel["options"]["reduceOptions"]["calcs"] == ["lastNotNull"], panel["title"]
+
+
+def test_every_bar_is_named_even_when_it_is_alone():
+    # Rendered on the real stack (2026-10-28): Grafana hides the name of a panel's only
+    # value, unless a display name is set. A quiet demo often has one value per panel
+    # ("Predicted models: 2", but which model?), so each bar names its label explicitly.
+    for panel in DASHBOARD["panels"]:
+        if panel["type"] == "bargauge":
+            label = panel["targets"][0]["legendFormat"].strip("{}")
+            name = panel["fieldConfig"]["defaults"].get("displayName")
+            assert name == "${__field.labels." + label + "}", panel["title"]

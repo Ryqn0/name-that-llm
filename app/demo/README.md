@@ -94,7 +94,17 @@ the site works and how the models do on real texts:
 
 **Your text never leaves your browser,** in any form: no excerpt, no fingerprint, no word
 list. There are no cookies, nothing is stored on your device, and nothing identifies you or
-links two visits.
+links two visits. Each event even carries a fresh random number, which the monitoring
+service requires and which links nothing.
+
+Two more things, to be complete:
+- **The monitoring service (Grafana Cloud) adds one fact** to each stored event: whether
+  your browser runs on a phone, read from the standard header every browser sends. Like
+  any website, the servers that receive the page's requests, Hugging Face's and
+  Grafana's, see your IP address. The stored events don't include it.
+- **When a second model is being tested,** your browser downloads it after your first
+  answer, in the background: about 35 MB more. It's skipped when your browser asks to save
+  data, or on a slow connection.
 
 ## Limitations
 
