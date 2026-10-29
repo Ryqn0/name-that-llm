@@ -132,20 +132,15 @@ def test_llm_explore_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_pat
 
 
 def test_llm_final_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_path, monkeypatch):
-    # Notebook 12's first session (P7 Task 7): the pooled LLM at 1 epoch on seed-7 folds 0
-    # and 1, against notebook 11's 2-epoch run on the same folds. Within 0.005, the cheaper
-    # 1 epoch wins, and every later run costs half.
+    # Notebook 12's second session (P7 Task 7). Session 1 showed that 1 epoch loses 0.045, so
+    # the final seed, 42, trains at 2 epochs: folds 0-1, then 2-3, then 4, as many as fit in
+    # the session. Each fold keeps its predictions and its adapter (for the submission).
     pytest.importorskip("peft")
     import pandas as pd
 
     inp = tmp_path / "input"
     fake_kaggle_input(inp, tiny_qwen, fake_train)
     fake_open_pool(inp)
-    explore = inp / "name-that-llm-llm-explore"  # notebook 11's output: its results table
-    explore.mkdir()
-    pd.DataFrame(
-        [{"name": "pool5000", "pool_size": 5000, "fold0": 0.47, "fold1": 0.41, "mean": 0.44}]
-    ).to_csv(explore / "results.csv", index=False)
     work = tmp_path / "working"
     work.mkdir()
     config = tmp_path / "llm.yaml"
@@ -161,9 +156,10 @@ def test_llm_final_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_path,
     run_notebook(NOTEBOOKS / "12-llm-final" / "llm_final.ipynb", env, monkeypatch)
 
     results = pd.read_csv(work / "results.csv")
-    assert list(results["name"]) == ["ep1-seed7"]
-    assert results[["fold0", "fold1", "mean"]].stack().between(0, 1).all()
+    assert list(results["name"]) == ["seed42-f01", "seed42-f23", "seed42-f4"]  # all fit here
+    assert set(results["epochs"]) == {2} and set(results["seed"]) == {42}
     summary = json.loads((work / "results.json").read_text())
-    assert summary["reference"]["mean"] == 0.44  # notebook 11's pool5000, the same folds
-    assert summary["chosen_epochs"] in (1, 2)
-    assert np.load(work / "runs" / "ep1-seed7" / "fold0.npz")["fold0"].shape[1] == 18
+    assert summary == {"seed": 42, "folds_done": [0, 1, 2, 3, 4], "folds_left": []}
+    for job, k in [("seed42-f01", 0), ("seed42-f01", 1), ("seed42-f23", 3), ("seed42-f4", 4)]:
+        assert np.load(work / "runs" / job / f"fold{k}.npz")[f"fold{k}"].shape[1] == 18
+        assert (work / "adapters" / job / f"fold{k}" / "adapter_config.json").exists()
