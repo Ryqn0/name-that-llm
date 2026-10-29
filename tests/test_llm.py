@@ -169,3 +169,10 @@ def test_probe_writes_its_timing_from_its_own_process(tiny_qwen, fake_data_dir, 
     assert set(timing) == keys and timing["seconds_per_passage"] >= 0
     with pytest.raises(SystemExit):  # neither --folds nor --probe
         main(argv)
+
+
+def test_a_cut_deeper_than_the_model_is_refused(tiny_qwen):
+    # tiny_qwen has 12 blocks: a 24-block cut can't be made, and must say so clearly,
+    # not fail with an IndexError deep inside transformers.
+    with pytest.raises(ValueError, match="12 blocks"):
+        load_llm_classifier(_cfg(tiny_qwen, n_layers=24))
