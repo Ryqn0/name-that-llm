@@ -2,6 +2,53 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-10-29 · Session 10: the pool lifts everything it touches
+
+**Did**
+- **P7 Task 6 shipped (#62).** Notebook 11 found that the pool lifts the LLM too: 0.373 →
+  0.444 on two proxy folds. Fewer blocks or shorter inputs only hurt. `configs/llm.yaml`
+  now trains on 5,000 pool passages per fold.
+- **I-029, promoted (#63).** The CPU check ran overnight, with a pause while the PC slept.
+  The pool inside the ensemble's `lr` lifts the whole ensemble to CV **0.4705**, against
+  0.4219 (95% CI [+0.032, +0.065]), with no GPU at all.
+- **Its submission is ready (#64):** the config, `submit.py` and the notebook, released as
+  lib v0.9.0. It's waiting for GPU quota, and for your OK.
+- **Task 7 started** (notebook 12, private):
+  - session 1: 1 epoch loses 0.045 against 2, so the LLM keeps 2 epochs;
+  - session 2 (the final seed, 42, keeping the adapters) is running.
+- **W&B, from the PC:** notebooks 10, 11 and 12 (session 1) are logged, through
+  `scripts/log_gpu_run.py`.
+- **You asked how many tokens the project has used:** about 846 million so far. 98% of
+  them were the conversation re-read from the cache.
+
+**Learned**
+- **A cheap win can hide in a member you already have.** The plan gave the pool only to
+  the LLM. Giving it to `lr` lifted the ensemble by +0.045, with no GPU at all.
+- **Count the whole pipeline before estimating.** "Submit on CPU" sounded free. But the
+  notebook also recomputes the training features and runs a 4,000-row check, about 10,700
+  passages through Qwen and five ModernBERTs: far too slow on a CPU.
+- **Measure rather than extrapolate.** One epoch took 122 minutes, not the projected 214,
+  and notebook 11's 2 epochs had taken 420. The job runner now re-learns its speed after
+  every job.
+- **A test can pass for the wrong reason.** pydantic's ValidationError is a ValueError,
+  and its message mentioned "pool", so the missing-pool test passed before the code
+  existed. It now matches the exact message.
+- **Sleep pauses long local runs.** Check a run's CPU time, not just whether it's alive.
+
+**Scores** (balanced accuracy)
+
+| model | CV |
+|---|---|
+| **ensemble + pool** (I-029, seed 42) | **0.4705** |
+| ensemble (the champion, LB 0.410; seed 42) | 0.4219 |
+| LLM + pool, 2 epochs (seed-7 folds 0 and 1) | 0.444 |
+| LLM + pool, 1 epoch (the same folds) | 0.399 |
+
+**Next**
+- Submit I-029's ensemble, once session 2 has ended (your OK).
+- Session 2's folds and adapters, then session 3 for the rest, then the four-member
+  ensemble.
+
 ## 2026-10-28 · Session 9: the site watched, the models compared live, and the first LLM run
 
 **Did**
