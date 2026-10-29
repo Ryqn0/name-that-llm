@@ -38,8 +38,7 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 - Phase: **P7 in progress** (LLM and ensemble:
   [design](docs/superpowers/specs/2026-10-27-p7-llm-ensemble-design.md),
-  [plan](docs/superpowers/plans/2026-10-27-p7-llm-ensemble.md)). Tasks 1–5 of 9 are done.
-  **Task 6 is running on Kaggle** (notebook 11, pushed 2026-10-28 22:41).
+  [plan](docs/superpowers/plans/2026-10-27-p7-llm-ensemble.md)). Tasks 1–6 of 9 are done.
 - **P6** (the MLOps loop) was done on 2026-10-28:
   [plan](docs/superpowers/plans/2026-10-27-p6-mlops-loop.md),
   [journal](docs/journal/p6-mlops-loop.md),
@@ -71,6 +70,19 @@ outputs are a public repo, a progress diary, and a live demo app.
       - the LLM alone scored **0.3641**, against the encoder's 0.3590;
       - the best 4-member blend scored **0.4523**, against the ensemble's 0.4293. That's
         in-sample on seed 7; Task 7 judges it on fresh seeds.
+    - **The pool lifts the LLM too** (notebook 11, on proxy folds 0 and 1 of seed 7):
+      - **0.373 → 0.444** with 5,000 pool passages per fold (+0.070, and both folds
+        gained);
+      - fewer blocks or shorter inputs only hurt;
+      - `configs/llm.yaml` now has full depth, 512 tokens, and `pool_size` 5000.
+      - **The cost:** 420 minutes per pair of folds with the pool. A full 5-fold run takes
+        about 21 GPU-hours, which changes Task 7's budget.
+    - **The pool in the ensemble's `lr` too (I-029, CPU only): promoted.** CV **0.4705**
+      against the champion's 0.4219 on seed 42 (95% CI [+0.0315, +0.0652]), and +0.0456
+      and +0.0393 on seeds 43 and 44. The weights are 0.75 / 0.10 / 0.15, chosen on seed 7.
+    - **Task 7, session 1** (notebook 12): 1 epoch loses 0.045 (0.399 against 0.444), so
+      the LLM keeps 2 epochs. One epoch took 122 minutes, so a pair of folds may take
+      about 4 hours, not 7.
   - **The free public demo is live:** <https://huggingface.co/spaces/Ryqn/name-that-llm>.
     It's a static Space: the page runs `lr` in the visitor's browser (`app/demo/ntl.js`,
     parity-tested against scikit-learn), so the text never leaves the device. Its model is
@@ -123,6 +135,7 @@ CV = the seed-42 folds, the same for every row.
 
 | date | model | CV | LB | W&B run |
 |---|---|---|---|---|
+| 2026-10-29 | ensemble + pool (lr with 30,000 pool passages + LM head + ModernBERT, 0.75 / 0.10 / 0.15) | 0.4705 | — | — |
 | 2026-10-26 | **ensemble** (lr + LM head + ModernBERT, 0.70 / 0.15 / 0.15) | 0.4219 | **0.410** | — |
 | 2026-10-26 | encoder (ModernBERT-base, tuned) | 0.3501 | — | — |
 | 2026-10-25 | lm_blend (lr + Qwen 3 4B layers 6–9) | 0.4052 | **0.389** | — |
@@ -282,39 +295,31 @@ CV = the seed-42 folds, the same for every row.
 
 ## Next steps
 
-State at the end of session 9 (2026-10-28): **P6 is done**, and the monitoring loop is
-live. **P7 Tasks 1–5 are done, and Task 6 is running on Kaggle**: notebook 11, pushed
-22:41, at most 11 hours. **I-029 is running on this PC**, detached from the session. Work
-on the branch `p7-i029-pool-ensemble`, which is pushed but not merged.
+State at the end of session 10 (2026-10-29): **P7 Tasks 1–6 are done, and I-029 is
+promoted.** Task 7's session 2 is running on Kaggle (notebook 12, version 3, pushed 17:32,
+at most 10.5 hours): seed 42 at 2 epochs, as many folds as fit, keeping the adapters. Task
+7's work is on the branch `p7-07-llm-final` (pushed; not merged). The ledger:
+`.superpowers/sdd/2026-10-27-p7-llm-ensemble/progress.md`.
 
-1. **I-029: does the pool help the ensemble, through its `lr` member?**
-   - Read `data/runs/i029-pool-ensemble.log`. Its last line is the verdict: PROMOTE if the
-     seed-42 bootstrap's lower bound is above 0.
-   - If the log is cut short, the PC shut down or restarted: re-run
-     `python -I -X utf8 scripts/pool_ensemble_check.py`. It takes about 3¼ hours on CPU,
-     about 50 minutes a seed: the weekly retraining's `lr` plus the pool took 47 minutes
-     on GitHub.
-   - **If PROMOTE:** it's a submission candidate that needs no GPU (the user's OK), and it
-     becomes Task 7's `lr` member. Record the numbers in IDEAS I-029 either way, then ship
-     the branch.
-2. **P7 Task 6's results:**
-   - download them: `kaggle kernels output ryqn00/name-that-llm-llm-explore -p
-     data/kaggle-outputs/llm-explore`, with the Avast certificate variables set;
-   - read `results.csv` and `llm-chosen.yaml`;
-   - copy the chosen settings into `configs/llm.yaml`, with their evidence, including
-     whether the pool helped the LLM;
-   - fill in notebook 11's Findings, and ship (branch `p7-06-llm-explore`).
+1. **Submit the ensemble with the pool in `lr`** (I-029: CV 0.4705, against 0.4219):
+   - `EnsembleConfig` names the text member's pool size;
+   - `submit.py` fits `lr` on our passages plus 30,000 pool passages;
+   - the submission notebook attaches the open-pool dataset;
+   - a new lib release (the tag needs the user's OK);
+   - then push and submit (the user's OK).
 
-   The ledger: `.superpowers/sdd/2026-10-27-p7-llm-ensemble/progress.md`.
-3. **W&B for the GPU runs, logged from the PC** (Kaggle gives no secret to API-pushed
-   runs):
-   - notebook 10 is logged: run `u0062ugi`, by `scripts/log_gpu_run.py`;
-   - notebook 11 gives fold scores, not a full OOF file, so logging its results table needs
-     a small addition to the script.
-4. **P7 Task 7:** the final LLM run on the chosen settings (seeds 42, 43, 44), the
-   four-member ensemble, and the A/B gate. It needs the user's OK for its GPU push.
-   - As planned, it could take up to 30 GPU-hours: more than one 12-hour Kaggle session,
-     and about a week's quota. Split it.
+   The submission's own run needs about 30 GPU-minutes.
+2. **Session 2's results:**
+   - download them: `kaggle kernels output ryqn00/name-that-llm-llm-final -p
+     data/kaggle-outputs/llm-final-s2`;
+   - log them with `scripts/log_gpu_run.py`.
+   - **Keep every adapter:** a later version of the notebook replaces this one's outputs,
+     and the submission needs all 5 folds. The folds left go to session 3.
+3. **Task 7's ensemble, on the PC:** the LLM's seed-42 OOF, plus `lr` with the pool, the
+   LM head and the encoder.
+   - Choose the weights by nested CV inside seed 42, since the LLM has no other seed.
+   - Then the A/B gate against the I-029 ensemble.
+4. **Task 8:** the four-member submission.
 5. **Now and then:**
    - look at the dashboard;
    - answer "Do you know who wrote it?" on texts whose author you know;

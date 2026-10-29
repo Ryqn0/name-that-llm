@@ -72,3 +72,52 @@ def test_llm_first_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_path,
     assert set(timing) == keys  # a tiny model's projection rounds to 0 minutes
     scores = json.loads((work / "results.json").read_text())["scores"]
     assert {"lr", "LM head", "encoder", "ensemble", "LLM", "best 4-member blend"} <= set(scores)
+
+
+def test_llm_explore_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_path, monkeypatch):
+    pytest.importorskip("peft")
+    import pandas as pd
+
+    from name_that_llm.config import LLMConfig
+    from name_that_llm.labels import LABELS
+
+    inp = tmp_path / "input"
+    fake_kaggle_input(inp, tiny_qwen, fake_train)
+    rng = np.random.default_rng(1)
+    first = inp / "name-that-llm-llm-first"  # notebook 10's output: its seed-7 OOF
+    first.mkdir()
+    p = rng.random((len(fake_train), 18))
+    np.save(first / "oof-llm-seed7.npy", p / p.sum(axis=1, keepdims=True))
+    pool = inp / "name-that-llm-open-pool"  # the public pool, two of the kept sources
+    pool.mkdir()
+    kept = ["drjcfmd/ntl-generated-v2", "ayhampar/ntl-pool-ft"]
+    rows = [
+        {
+            "text": f"pooltopic{i} " + f"marker{i % 18} words about things here " * 7,
+            "model": LABELS[i % 18],
+            "source_dataset": kept[i % 2],
+        }
+        for i in range(36)
+    ]
+    pd.DataFrame(rows).to_parquet(pool / "ntl_open_pool.parquet")
+    work = tmp_path / "working"
+    work.mkdir()
+    config = tmp_path / "llm.yaml"
+    tiny = dict(name="llm", base_model="unused", load_in_4bit=False, n_layers=4, lora_r=4)
+    tiny |= dict(lora_alpha=8, max_length=64, batch_size=8, lr=5e-3, epochs=1)
+    config.write_text(yaml.safe_dump(tiny), encoding="utf-8")
+    env = {
+        "NTL_INPUT": str(inp),
+        "NTL_WORK": str(work),
+        "NTL_LLM_CONFIG": str(config),
+        "NTL_DATA_DIR": str(fake_data_dir),
+    }
+    run_notebook(NOTEBOOKS / "11-llm-explore" / "llm_explore.ipynb", env, monkeypatch)
+
+    results = pd.read_csv(work / "results.csv")
+    assert results["name"].iloc[0] == "baseline (notebook 10)"
+    assert sum(results["name"].str.startswith("layers")) == 2  # 2/3 and 4/9 of the blocks
+    assert {"len320", "pool5000", "pool15000"} <= set(results["name"])
+    assert results["mean"].between(0, 1).all()
+    chosen = LLMConfig(**yaml.safe_load((work / "llm-chosen.yaml").read_text(encoding="utf-8")))
+    assert chosen.seed == 7 and chosen.pool_size in (0, 5000, 15000)

@@ -1,7 +1,19 @@
 # The LLM classifier (P7, llm.py): Qwen 3 8B base, with LoRA on its 4-bit weights.
 # The notebooks override base_model with the mounted Kaggle Models folder
-# (lm.find_model_dir("8b-base")). n_layers, pool_size and the step size come from
-# notebook 11's exploration; until then, the usual QLoRA starting points.
+# (lm.find_model_dir("8b-base")).
+#
+# Chosen by notebooks/11-llm-explore (run of 2026-10-28, two T4s, 11 hours). Proxy folds 0
+# and 1 of the seed-7 split, one change at a time, mean balanced accuracy:
+#   - baseline, full depth, 512 tokens, no pool (notebook 10's folds): 0.373
+#   - depth: 24 of 36 blocks 0.337, 16 blocks 0.349. Cutting the model hurts: full depth.
+#   - length: 320 tokens 0.360. Shorter loses the end of long passages: 512.
+#   - the pool: 5,000 passages per fold 0.444, so +0.070. That's the big lever, and far
+#     beyond the fine-tuning noise seen in P5 (0.014). 15,000 wasn't tried: it was projected
+#     at 995 minutes, beyond the session.
+#   - the step size and the epochs weren't tried (no time left), so lr and epochs stay at
+#     the usual QLoRA starting points.
+# The cost: with the pool, one pair of folds (one per GPU) took 420 minutes, against about
+# 80 per fold without it. A full 5-fold run with the pool takes about 21 GPU-hours.
 name: llm
 base_model: Qwen/Qwen3-8B-Base
 n_layers: null
@@ -15,6 +27,6 @@ lr: 0.0001
 epochs: 2
 warmup_ratio: 0.05
 weight_decay: 0.0
-pool_size: 0
+pool_size: 5000
 n_splits: 5
 seed: 42

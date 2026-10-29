@@ -83,7 +83,9 @@ def test_shipped_lm_blend_config_loads_with_its_text_config():
 
 def test_shipped_llm_config_loads():
     # The GPU notebooks train the LLM by NAME from the installed package (P7), and override
-    # base_model with the mounted Kaggle Models folder. Pool-free unless a notebook says so.
+    # base_model with the mounted Kaggle Models folder. Notebook 11 chose the full depth,
+    # 512 tokens and 5,000 pool passages per fold: the pool lifted the LLM by +0.070.
     cfg = load_config("llm", model_cls=LLMConfig)
     assert cfg.name == "llm" and cfg.base_model == "Qwen/Qwen3-8B-Base"
-    assert cfg.load_in_4bit and cfg.pool_size == 0 and cfg.seed == 42
+    assert cfg.load_in_4bit and cfg.seed == 42
+    assert cfg.n_layers is None and cfg.max_length == 512 and cfg.pool_size == 5000

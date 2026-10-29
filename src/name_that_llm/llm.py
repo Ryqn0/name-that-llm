@@ -71,7 +71,13 @@ def _base_model(cfg: LLMConfig, device: str):
     )
     if cfg.n_layers is not None:
         # The cut, as in lm.load_lm_layers: the later blocks are never built, and their
-        # weights are skipped while loading.
+        # weights are skipped while loading. It can only remove blocks: asking for more than
+        # the model has would build untrained blocks, or fail deep inside transformers.
+        if cfg.n_layers > config.num_hidden_layers:
+            raise ValueError(
+                f"n_layers={cfg.n_layers}, but {cfg.base_model} has only "
+                f"{config.num_hidden_layers} blocks"
+            )
         config.num_hidden_layers = cfg.n_layers
         if getattr(config, "layer_types", None):
             config.layer_types = config.layer_types[: cfg.n_layers]
