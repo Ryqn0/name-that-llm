@@ -9,9 +9,14 @@ notebook's own numbers (results.json's "scores") go into the summary too.
 The score is recomputed from the OOF file on our folds of --seed. If it doesn't match the
 notebook's, the rows aren't in the training data's order, and nothing is logged.
 
+An exploration's results.csv (notebook 11: fold scores per setting, no full OOF) is logged
+as a table instead, one summary number per setting.
+
 Usage (repo root, `wandb login` done):
   python -I -X utf8 scripts/log_gpu_run.py OOF.npy --seed 7 --name llm-first \
       [--results results.json] [--expect LLM]
+  python -I -X utf8 scripts/log_gpu_run.py results.csv --seed 7 --name llm-explore \
+      --config llm-chosen.yaml
 """
 
 import argparse
@@ -23,8 +28,22 @@ import numpy as np
 from name_that_llm.config import LLMConfig, load_config
 from name_that_llm.cv import make_folds
 from name_that_llm.data import load_train
-from name_that_llm.tracking import log_cv_run
+from name_that_llm.tracking import PROJECT, log_cv_run
 from name_that_llm.train import _result
+
+
+def log_table(path: Path, name: str, cfg: LLMConfig) -> None:
+    """Log an exploration's results table (one row per setting) as a W&B run."""
+    import pandas as pd
+
+    import wandb
+
+    table = pd.read_csv(path)
+    run = wandb.init(project=PROJECT, job_type="explore", name=name, config=cfg.model_dump())
+    run.log({"results": wandb.Table(dataframe=table)})
+    run.summary.update({f"{row['name']}/mean": row["mean"] for _, row in table.iterrows()})
+    run.finish()
+    print(f"{name}: {len(table)} settings | W&B run: {run.id}")
 
 
 def main(argv=None) -> None:
@@ -36,6 +55,9 @@ def main(argv=None) -> None:
     parser.add_argument("--results", type=Path, help="the notebook's results.json")
     parser.add_argument("--expect", help="results.json's score key that must match the OOF's")
     args = parser.parse_args(argv)
+    if args.oof.suffix == ".csv":  # an exploration's table: fold scores, no OOF to re-score
+        log_table(args.oof, args.name, load_config(args.config, model_cls=LLMConfig))
+        return
 
     train = load_train()
     oof = np.load(args.oof).astype(float)
