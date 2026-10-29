@@ -117,3 +117,37 @@ def test_predict_submission_ensemble_rejects_misaligned_encoder_probabilities(
 ):
     with pytest.raises(ValueError):  # 2 rows of encoder probabilities for 3 test rows
         _ensemble(fake_train, fake_data_dir, (0.4, 0.3, 0.3), p_encoder=np.full((2, 18), 1 / 18))
+
+
+def _pool_ensemble(fake_train, test, text_pool, pool):
+    """predict_submission_ensemble with the text model's weight only, and `pool`."""
+    rng = np.random.default_rng(0)
+    return predict_submission_ensemble(
+        _cfg(),
+        BlendConfig(name="b", lm_variation="x", layer=0, weight=0.5),
+        EnsembleConfig(name="e", weights=(1.0, 0.0, 0.0), text_pool=text_pool),
+        fake_train,
+        test,
+        rng.normal(size=(len(fake_train), 8)),
+        rng.normal(size=(len(test), 8)),
+        rng.dirichlet(np.ones(18), size=len(test)),
+        pool=pool,
+    )
+
+
+def test_predict_submission_ensemble_trains_lr_on_the_pool(fake_train):
+    # I-029: with text_pool, lr also learns from the pool. A word that only the pool uses,
+    # always under one label, must pull a test passage made of it to that label.
+    text = "zebracorn quillfeather passage " * 6
+    pool = pd.DataFrame({"text": [text] * 40, "model": LABELS[3], "source": "s", "prompt_id": None})
+    test = pd.DataFrame({"id": ["a", "b"], "text": [text, text]})
+    sub = _pool_ensemble(fake_train, test, text_pool=40, pool=pool)
+    assert set(sub["model"]) == {LABELS[3]}
+
+
+def test_predict_submission_ensemble_needs_its_pool(fake_train):
+    # A config that trains lr on the pool, called without one, must fail loudly: silently
+    # dropping the pool would submit a weaker model than the one that was measured.
+    test = pd.DataFrame({"id": ["a"], "text": ["some passage"]})
+    with pytest.raises(ValueError, match="pass the pool"):
+        _pool_ensemble(fake_train, test, text_pool=40, pool=None)

@@ -18,6 +18,7 @@ from name_that_llm.config import BlendConfig, EnsembleConfig, ExperimentConfig
 from name_that_llm.grouping import topic_groups
 from name_that_llm.labels import LABELS
 from name_that_llm.models import build_dense_model, build_model
+from name_that_llm.pool import pool_for_fold
 from name_that_llm.schemas import validate_submission
 
 
@@ -113,6 +114,7 @@ def predict_submission_ensemble(
     lm_train: np.ndarray,
     lm_test: np.ndarray,
     p_encoder: np.ndarray,
+    pool: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """The P5 submission: the text model, the LM head and a fine-tuned encoder, blended.
 
@@ -120,11 +122,25 @@ def predict_submission_ensemble(
     models (encoder.predict_proba_folds). The notebook computes it, so this module stays
     torch-free like the LM features. `blend_cfg` supplies the LM head's C; its own weight
     is ignored, since `ens_cfg.weights` sets all three shares together.
+
+    `pool` (pool.build_pool) is required when `ens_cfg.text_pool` > 0 (I-029): the text
+    model then also trains on a seeded sample of that many pool passages. Every prompt is
+    ours to train on here, so no pool row is held out (as in the weekly retraining's fit).
     """
     _check_lm_rows(train, test, lm_train, lm_test)
     expected = (len(test), len(LABELS))
     if np.shape(p_encoder) != expected:
         raise ValueError(f"encoder probabilities have shape {np.shape(p_encoder)}, not {expected}")
-    p_text = predict_proba_test(text_cfg, train, test)
+    text_train = train
+    if ens_cfg.text_pool:
+        if pool is None:
+            raise ValueError(
+                f"{ens_cfg.name} trains its text model on {ens_cfg.text_pool:,} pool passages: "
+                "pass the pool"
+            )
+        extra = pool_for_fold(pool, set(), ens_cfg.text_pool, seed=text_cfg.seed)
+        columns = ["text", "model"]
+        text_train = pd.concat([train[columns], extra[columns]], ignore_index=True)
+    p_text = predict_proba_test(text_cfg, text_train, test)
     p_lm = _lm_proba(blend_cfg.C, train, lm_train, lm_test)
     return _submission(blend([p_text, p_lm, p_encoder], ens_cfg.weights), test)

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, NonNegativeFloat
+from pydantic import BaseModel, ConfigDict, Field, NonNegativeFloat, NonNegativeInt
 
 
 class ExperimentConfig(BaseModel):
@@ -124,6 +124,10 @@ class EnsembleConfig(BaseModel):
     encoder: str = "encoder"  # the EncoderConfig of the fine-tuned encoder
     # text model, LM head, encoder, in that order. blend() normalizes them to sum to 1.
     weights: tuple[NonNegativeFloat, NonNegativeFloat, NonNegativeFloat]
+    # Pool passages the text model also trains on (I-029: 30,000 lifted the ensemble by
+    # +0.049 on seed 42). 0: our passages only, as in P5. The LM head and the encoder never
+    # see the pool.
+    text_pool: NonNegativeInt = 0
 
 
 def load_config(name_or_path: str | Path, model_cls: type[BaseModel] = ExperimentConfig):
