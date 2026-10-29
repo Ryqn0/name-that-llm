@@ -1,6 +1,6 @@
 [project]
 name = "name-that-llm"
-version = "0.8.0"
+version = "0.9.0"
 description = "End-to-end MLOps project for the Kaggle Name That LLM competition"
 readme = "README.md"
 license = "MIT"

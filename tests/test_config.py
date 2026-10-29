@@ -68,9 +68,20 @@ def test_shipped_ensemble_config_loads():
     # by NAME, then the blend and the encoder it names: a typo in any of them would only
     # surface during the 9-hour scoring run.
     cfg = load_config("ensemble", model_cls=EnsembleConfig)
-    assert cfg.name == "ensemble"
+    assert cfg.name == "ensemble" and cfg.text_pool == 0  # P5's ensemble: no pool
     assert load_config(cfg.blend, model_cls=BlendConfig).name == cfg.blend
     assert load_config(cfg.encoder, model_cls=EncoderConfig).name == cfg.encoder
+
+
+def test_shipped_ensemble_pool_config_loads():
+    # I-029's ensemble (P7): the same three members, with lr also trained on 30,000 pool
+    # passages, and the weights chosen on seed 7 (CV 0.4705 against 0.4219 on seed 42).
+    cfg = load_config("ensemble_pool", model_cls=EnsembleConfig)
+    assert cfg.text_pool == 30_000 and cfg.weights == (0.75, 0.1, 0.15)
+    assert load_config(cfg.blend, model_cls=BlendConfig).name == cfg.blend
+    assert load_config(cfg.encoder, model_cls=EncoderConfig).name == cfg.encoder
+    with pytest.raises(ValidationError):
+        EnsembleConfig(name="e", weights=(1, 0, 0), text_pool=-1)
 
 
 def test_shipped_lm_blend_config_loads_with_its_text_config():

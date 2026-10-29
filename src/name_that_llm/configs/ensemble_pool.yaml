@@ -1,0 +1,17 @@
+# I-029's ensemble (P7): the P5 ensemble's three members, with the text model (`lr`) also
+# trained on 30,000 pool passages. The LM head and the encoder are unchanged.
+# Chosen by scripts/pool_ensemble_check.py (2026-10-29):
+#   - The weights were chosen on the seed-7 folds, by an exact search in steps of 0.05.
+#   - On fresh folds: seed 42 scored 0.4705 against the P5 ensemble's 0.4219 (+0.0486,
+#     prompt bootstrap 95% CI [+0.0315, +0.0652]); seeds 43 and 44 gained +0.0456 and
+#     +0.0393.
+# In the final fit, lr trains on all our passages plus a seeded sample of the pool
+# (pool.pool_for_fold, with no held-out prompts), as the weekly retraining does.
+name: ensemble_pool
+blend: lm_blend
+encoder: encoder
+text_pool: 30000
+weights:  # text, LM head, encoder
+- 0.75
+- 0.1
+- 0.15
