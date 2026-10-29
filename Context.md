@@ -38,8 +38,7 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 - Phase: **P7 in progress** (LLM and ensemble:
   [design](docs/superpowers/specs/2026-10-27-p7-llm-ensemble-design.md),
-  [plan](docs/superpowers/plans/2026-10-27-p7-llm-ensemble.md)). Tasks 1–5 of 9 are done.
-  **Task 6 is running on Kaggle** (notebook 11, pushed 2026-10-28 22:41).
+  [plan](docs/superpowers/plans/2026-10-27-p7-llm-ensemble.md)). Tasks 1–6 of 9 are done.
 - **P6** (the MLOps loop) was done on 2026-10-28:
   [plan](docs/superpowers/plans/2026-10-27-p6-mlops-loop.md),
   [journal](docs/journal/p6-mlops-loop.md),
@@ -71,6 +70,13 @@ outputs are a public repo, a progress diary, and a live demo app.
       - the LLM alone scored **0.3641**, against the encoder's 0.3590;
       - the best 4-member blend scored **0.4523**, against the ensemble's 0.4293. That's
         in-sample on seed 7; Task 7 judges it on fresh seeds.
+    - **The pool lifts the LLM too** (notebook 11, on proxy folds 0 and 1 of seed 7):
+      - **0.373 → 0.444** with 5,000 pool passages per fold (+0.070, and both folds
+        gained);
+      - fewer blocks or shorter inputs only hurt;
+      - `configs/llm.yaml` now has full depth, 512 tokens, and `pool_size` 5000.
+      - **The cost:** 420 minutes per pair of folds with the pool. A full 5-fold run takes
+        about 21 GPU-hours, which changes Task 7's budget.
   - **The free public demo is live:** <https://huggingface.co/spaces/Ryqn/name-that-llm>.
     It's a static Space: the page runs `lr` in the visitor's browser (`app/demo/ntl.js`,
     parity-tested against scikit-learn), so the text never leaves the device. Its model is
