@@ -24,6 +24,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 from name_that_llm.config import LLMConfig, load_config
 from name_that_llm.cv import make_folds
@@ -34,9 +35,7 @@ from name_that_llm.train import _result
 
 def log_table(path: Path, name: str, cfg: LLMConfig) -> None:
     """Log an exploration's results table (one row per setting) as a W&B run."""
-    import pandas as pd
-
-    import wandb
+    import wandb  # alone: ruff would group it differently here (a local wandb/ run folder)
 
     table = pd.read_csv(path)
     run = wandb.init(project=PROJECT, job_type="explore", name=name, config=cfg.model_dump())
