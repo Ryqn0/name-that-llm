@@ -1,0 +1,21 @@
+# The LLM as a POOL MEMBER (P8, spec §5.4): Qwen3-8B with LoRA, trained once on the honest
+# pool (pool_member.py), every label weighted equally. The settings are notebook 11's, as in
+# llm.yaml, with far more of the pool: 18,000 passages take about 10 hours for 2 epochs on a
+# T4, at about 1 second per passage per epoch (P7, notebook 12). Notebook 14 trains two
+# seeds, one per T4, each on its own sample.
+name: llm_pool
+base_model: Qwen/Qwen3-8B-Base
+n_layers: null
+load_in_4bit: true
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+max_length: 512
+batch_size: 8
+lr: 0.0001
+epochs: 2
+warmup_ratio: 0.05
+weight_decay: 0.0
+pool_size: 18000
+n_splits: 5
+seed: 42

@@ -100,3 +100,11 @@ def test_shipped_llm_config_loads():
     assert cfg.name == "llm" and cfg.base_model == "Qwen/Qwen3-8B-Base"
     assert cfg.load_in_4bit and cfg.seed == 42
     assert cfg.n_layers is None and cfg.max_length == 512 and cfg.pool_size == 5000
+
+
+def test_shipped_pool_member_configs_load():
+    # P8's pool members: DeBERTa-v3-large, the pool maintainer's recipe (0.587 LB alone), and
+    # the LLM on far more of the pool. Their notebooks load them by NAME.
+    deberta = load_config("deberta_pool", model_cls=EncoderConfig)
+    assert deberta.base_model == "microsoft/deberta-v3-large"
+    assert load_config("llm_pool", model_cls=LLMConfig).pool_size == 18_000

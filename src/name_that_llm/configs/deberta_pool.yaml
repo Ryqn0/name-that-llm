@@ -1,0 +1,19 @@
+# DeBERTa-v3-large as a POOL MEMBER (P8, spec §5.3): fine-tuned once on the honest pool
+# (pool_member.py), every label weighted equally. The pool's maintainer took this model to
+# 0.587 public LB alone, trained on 193k clean passages.
+# Settings left to the builder by the spec (§7): starting points for a large encoder.
+#   - lr 1e-5: large models need smaller steps than base ones (ours used 4.4e-5 at base).
+#   - batch_size 8 at 512 tokens: what a T4's 16 GB holds for a 435M-parameter model.
+#   - pool_size 0: the notebook sets the real number from its speed probe, so the run fits
+#     the session (rows_for_budget).
+name: deberta_pool
+base_model: microsoft/deberta-v3-large
+max_length: 512
+batch_size: 8
+lr: 1.0e-05
+epochs: 2
+warmup_ratio: 0.1
+weight_decay: 0.01
+pool_size: 0
+n_splits: 5
+seed: 42
