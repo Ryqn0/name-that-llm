@@ -89,6 +89,22 @@ outputs are a public repo, a progress diary, and a live demo app.
     - **Task 7, session 1** (notebook 12): 1 epoch loses 0.045 (0.399 against 0.444), so
       the LLM keeps 2 epochs. One epoch took 122 minutes, so a pair of folds may take
       about 4 hours, not 7.
+      - **Caveat:** session 1 trained on the changed pool (below), and notebook 11 on the
+        old one, so the 0.045 mixes two effects.
+    - **The public pool changed under us (2026-10-29).**
+      - Its maintainer's clean release (v9, then v10) removed 2 of our 5 sources,
+        `prvsiyan` and `ayhampar`, among 70,558 rows. The three kept sources hold 28,048
+        passages.
+      - Notebook 12 and the submission use the clean pool; notebook 11, Task 3 and I-029
+        used the old one.
+      - **The clean 3-source pool is better for `lr`:** 0.4338 against 0.4205 (seed 42).
+      - 28,048 passages drawn from all 54 clean sources score only 0.3623, probably
+        because of class imbalance (I-032).
+    - **Task 7, session 2:** seed-42 folds 0–3 are done (0.461, 0.458, 0.496, 0.457), with
+      their adapters kept in `data/kaggle-outputs/llm-final-s2`. Fold 4 is left.
+    - **The four-member preview** (seed 42, folds 0–3, `scripts/llm_ensemble_check.py`,
+      weights chosen on the other folds): 0.5159 against I-029's 0.4705 (+0.045, 95% CI
+      [+0.030, +0.062]). Weights 0.60 / 0.15 / 0.00 / 0.25: the encoder drops out.
   - **The free public demo is live:** <https://huggingface.co/spaces/Ryqn/name-that-llm>.
     It's a static Space: the page runs `lr` in the visitor's browser (`app/demo/ntl.js`,
     parity-tested against scikit-learn), so the text never leaves the device. Its model is
@@ -124,24 +140,32 @@ outputs are a public repo, a progress diary, and a live demo app.
   - P4: hosting terms change, so check them early: free Docker Spaces disappeared behind a
     paywall. A model small enough for the browser costs nothing to serve. And look at the
     page: a headless browser found two layout bugs that every HTTP check had passed.
-- **Leaderboard snapshot, 2026-10-26:** 3,387 teams; median 0.532; top-10% cutoff 0.641;
-  best 0.710. With 0.410 we're about 2,236th (about 2,219th on 2026-10-25, with 0.389).
-- Champion: **`ensemble`** (since 2026-10-26), a weighted mean of three models'
-  probabilities, 0.70 / 0.15 / 0.15:
-  1. `lr`, the word + character TF-IDF logistic regression;
-  2. the LM head, a logistic regression on Qwen 3 4B base layers 6–9 (together with `lr`,
-     the previous champion `lm_blend`);
+  - P7: **the pool's gain held on the hidden prompts:** +0.049 in CV became **+0.044 on the
+    LB** (0.410 → 0.454), with a CV–LB gap of about −0.016. **A public dependency changes
+    silently:** the pool lost 2 of our sources between two runs, and only a count in a log
+    showed it (I-034).
+- **Leaderboard snapshot, 2026-10-30:** 3,954 teams; median 0.549; top-10% cutoff 0.658;
+  best 0.732. With 0.454 we're about 2,462nd (top 62%). On 2026-10-26: 3,387 teams, median
+  0.532, cutoff 0.641, and 0.410 was about 2,236th.
+- Champion: **`ensemble_pool`** (since 2026-10-30, public LB **0.454**), a weighted mean of
+  three models' probabilities, 0.75 / 0.10 / 0.15:
+  1. `lr`, the word + character TF-IDF logistic regression, trained on our passages plus
+     the clean pool's 28,048 (I-029);
+  2. the LM head, a logistic regression on Qwen 3 4B base layers 6–9;
   3. ModernBERT-base fine-tuned on our 18 labels: the average of its 5 fold models.
 
-  It beat `lm_blend` on fresh folds (+0.017 on seed 42, 95% CI [+0.004, +0.030]) and on the
-  public LB (0.410 vs 0.389). The offline submission runs it on a T4 GPU in about 30
-  minutes.
+  It beat `ensemble` (the same members, `lr` without the pool) on fresh folds (+0.049 on
+  seed 42, 95% CI [+0.032, +0.065]) and on the public LB (0.454 vs 0.410). The offline
+  submission runs it on a T4 GPU in about an hour. **The DagsHub registry, and so the local
+  app, still serve `ensemble` v1:** registering the new one needs
+  `scripts/register_champion.py` to fit `lr` with the pool.
 
 CV = the seed-42 folds, the same for every row.
 
 | date | model | CV | LB | W&B run |
 |---|---|---|---|---|
-| 2026-10-29 | ensemble + pool (lr with 30,000 pool passages + LM head + ModernBERT, 0.75 / 0.10 / 0.15) | 0.4705 | — | — |
+| 2026-10-30 | lr + the clean pool's 3 allowlisted sources (28,048 passages) | 0.4338 | — | — |
+| 2026-10-30 | **ensemble_pool** (I-029: lr + the pool, LM head, ModernBERT; 0.75 / 0.10 / 0.15) | 0.4705 | **0.454** | — |
 | 2026-10-26 | **ensemble** (lr + LM head + ModernBERT, 0.70 / 0.15 / 0.15) | 0.4219 | **0.410** | — |
 | 2026-10-26 | encoder (ModernBERT-base, tuned) | 0.3501 | — | — |
 | 2026-10-25 | lm_blend (lr + Qwen 3 4B layers 6–9) | 0.4052 | **0.389** | — |
@@ -308,37 +332,42 @@ CV = the seed-42 folds, the same for every row.
 
 ## Next steps
 
-State at the end of session 10 (2026-10-29): **P7 Tasks 1–6 are done, and I-029 is
-promoted and ready to submit.** Task 7's session 2 is running on Kaggle (notebook 12,
-version 3, pushed 17:32, at most 10.5 hours): seed 42 at 2 epochs, as many folds as fit,
-keeping the adapters. The ledger: `.superpowers/sdd/2026-10-27-p7-llm-ensemble/progress.md`.
+State at the end of session 11 (2026-10-30):
+- **I-029's ensemble scored 0.454 on the public LB** (up from 0.410; ref 57813381, lib
+  v0.9.0, the clean 3-source pool).
+- **Task 7:** seed 42's folds 0–3 are done; fold 4 waits for the weekly GPU reset.
+- **The demo's challenger was removed** (#66).
 
-1. **Submit I-029's ensemble** (CV 0.4705, against 0.4219; with the usual −0.013 gap,
-   about 0.457 on the LB, against 0.410).
-   - The code (#64) and lib v0.9.0 are ready: `notebooks/90-submit` selects
-     `ensemble_pool`.
-   - Push it, then submit; each needs the user's OK. Its run needs about an hour of GPU.
-   - Do it once session 2 has ended, so the quota left is known (the user had 11+ hours
-     before session 2).
-2. **Session 2's results:**
-   - download them: `kaggle kernels output ryqn00/name-that-llm-llm-final -p
-     data/kaggle-outputs/llm-final-s2`;
-   - log them with `scripts/log_gpu_run.py`.
-   - **Keep every adapter:** a later version of the notebook replaces this one's outputs,
-     and the submission needs all 5 folds. The folds left go to session 3.
-3. **Task 7's ensemble, on the PC:** the LLM's seed-42 OOF, plus `lr` with the pool, the
-   LM head and the encoder.
-   - Choose the weights by nested CV inside seed 42, since the LLM has no other seed.
-   - Then the A/B gate against the I-029 ensemble.
-4. **Task 8:** the four-member submission.
-5. **Now and then:**
+The ledger: `.superpowers/sdd/2026-10-27-p7-llm-ensemble/progress.md`.
+
+1. **Register `ensemble_pool` as the champion**, so the local app serves it.
+   - `scripts/register_champion.py` must first fit `lr` with the pool.
+   - Do it with Task 8, so the registry gets the four-member ensemble directly.
+2. **Session 3: seed 42's fold 4**, about 4 GPU-hours, after the weekly reset (the user's
+   OK).
+   - Push a new version of notebook 12 with `JOBS = [("seed42-f4", 42, (4,), {}, True)]`
+     and a budget under the quota left.
+   - **Keep folds 0–3's adapters:** they're in `data/kaggle-outputs/llm-final-s2`, and the
+     new version replaces the kernel's outputs. The submission needs all 5, in one place:
+     a private dataset, or a second kernel (I-034).
+3. **Task 7's gate on all 5 folds:** `python -I -X utf8 scripts/llm_ensemble_check.py
+   data/kaggle-outputs/llm-final-s2/runs <session 3's runs> --pool
+   data/pool/pool-v10-all.parquet`.
+4. **Task 8:** the four-member submission, with the LLM's inference in the submission
+   notebook (the plan's Task 8, now v0.10.0).
+5. **The bigger levers** (IDEAS):
+   - I-033: an encoder fine-tuned on the whole clean pool (the maintainer's DeBERTa-v3-large
+     scored 0.587 LB);
+   - I-032 and I-028: a label-balanced draw from the whole clean pool for `lr`;
+   - I-034: pin the pool.
+6. **Now and then:**
    - look at the dashboard;
    - answer "Do you know who wrote it?" on texts whose author you know;
    - weekly: the retraining may open a challenger PR, which is a person's decision.
-6. **Suggested, your setting:** branch protection on main (pull requests only, CI
+7. **Suggested, your setting:** branch protection on main (pull requests only, CI
    required). The retraining's token can write to the repo, and protection keeps main
    reachable through reviewed, tested pull requests only.
-7. Cheap follow-ups:
+8. Cheap follow-ups:
    - I-015: a calibrated or log blend, in P7 Task 7;
    - I-017: TF without IDF;
    - I-018: the weight grid inside each Optuna trial;

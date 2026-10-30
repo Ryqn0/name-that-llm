@@ -2,6 +2,46 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-10-30 · Session 11: 0.454 on the leaderboard, and a pool that changed under us
+
+**Did**
+- **Task 7, session 2** (notebook 12) trained the pooled LLM on seed 42's folds 0–3: 0.461,
+  0.458, 0.496 and 0.457, with every adapter kept. Fold 4 waits for the weekly GPU reset.
+- **Submitted I-029's ensemble** (`lr` with the pool, the LM head, the encoder): **public
+  LB 0.454**, up from 0.410.
+- **Found that the public pool changed:** its maintainer's clean release removed 2 of our 5
+  sources, some for licence or provenance risk. With your OK we submitted on the clean
+  pool, and **removed the demo's challenger** (#66), which had trained on the old one.
+- **Checked the clean pool for `lr`:** our 3 remaining sources score 0.4338, better than
+  the old 5 (0.4205). The same number drawn from all 54 clean sources scores only 0.3623.
+- **Previewed the four-member ensemble** on folds 0–3: **0.516** against 0.4705 (+0.045,
+  95% CI [+0.030, +0.062]). The encoder's weight falls to 0 once the LLM is in.
+
+**Learned**
+- **Watch your data's upstream.** A public dataset can change between two runs. Only one
+  count in a log revealed it. Log per-source counts, and pin a copy (I-034).
+- **A gain measured with a tight protocol survives the leaderboard:** +0.049 in CV became
+  +0.044 on hidden prompts.
+- **"Use the whole dataset" depends on the model.** For an unweighted `lr`, a random draw
+  from all sources skews the labels and costs 0.07. The maintainer's DeBERTa weighted every
+  label equally, and scored 0.587 on the LB with the whole pool.
+- **Weights for a model that exists on one seed only:** choose them by nested CV inside that
+  seed. Then no row is scored with weights fitted on it.
+
+**Scores**
+
+| model | CV (seed 42) | LB |
+|---|---|---|
+| **ensemble_pool** (I-029, submitted) | 0.4705 | **0.454** |
+| the previous champion, `ensemble` | 0.4219 | 0.410 |
+| four members, with the LLM (folds 0–3, nested) | 0.516 | — |
+| `lr` + the clean 3-source pool | 0.4338 | — |
+
+**Next**
+- Fold 4 after the weekly reset, then the four-member gate and its submission (Task 8).
+- The biggest lever in sight: an encoder trained on the whole clean pool, labels weighted
+  equally (I-033).
+
 ## 2026-10-29 · Session 10: the pool lifts everything it touches
 
 **Did**
