@@ -16,6 +16,19 @@ Newest entry first. Each entry follows the same format: **Did / Learned / Scores
   the old 5 (0.4205). The same number drawn from all 54 clean sources scores only 0.3623.
 - **Previewed the four-member ensemble** on folds 0–3: **0.516** against 0.4705 (+0.045,
   95% CI [+0.030, +0.062]). The encoder's weight falls to 0 once the LLM is in.
+- **Read what the top public notebooks are made of** (17 originals, metadata only). Their
+  passage data is mostly the clean pool we already use. Their edge is blending a dozen
+  models other participants trained and published.
+- **Designed P8, the medal push, with you:**
+  - we train our own strong models on the whole clean pool, and blend them;
+  - public code, private weights until the deadline;
+  - a checkpoint on 15 December.
+
+  Its plan has 9 tasks, and the first two are built:
+  - **the pinned pool:** a private copy of v10, plus a weekly GitHub job that compares each
+    new public release with it;
+  - **the honest pool member:** it trains once on the pool alone, with every label weighted
+    equally, and predicts all our passages honestly.
 
 **Learned**
 - **Watch your data's upstream.** A public dataset can change between two runs. Only one
@@ -27,6 +40,10 @@ Newest entry first. Each entry follows the same format: **Did / Learned / Scores
   label equally, and scored 0.587 on the LB with the whole pool.
 - **Weights for a model that exists on one seed only:** choose them by nested CV inside that
   seed. Then no row is scored with weights fitted on it.
+- **Here, the medal line is set by public notebooks:** forking a 0.66 notebook reaches the
+  top-10% cutoff (0.658). A medal means beating what's public, and with models we train.
+- **One honest run can replace five folds:** a member that never sees our passages, nor
+  pool passages about our prompts, predicts all of ours honestly at once.
 
 **Scores**
 
@@ -38,9 +55,10 @@ Newest entry first. Each entry follows the same format: **Did / Learned / Scores
 | `lr` + the clean 3-source pool | 0.4338 | — |
 
 **Next**
-- Fold 4 after the weekly reset, then the four-member gate and its submission (Task 8).
-- The biggest lever in sight: an encoder trained on the whole clean pool, labels weighted
-  equally (I-033).
+- P7's last steps: fold 4 (now that the GPU quota has reset), the four-member gate and its
+  submission.
+- P8: the generalized gate, then DeBERTa-v3-large on the pool, the first member trained on
+  all of it.
 
 ## 2026-10-29 · Session 10: the pool lifts everything it touches
 

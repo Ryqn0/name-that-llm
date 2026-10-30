@@ -39,6 +39,16 @@ outputs are a public repo, a progress diary, and a live demo app.
 - Phase: **P7 in progress** (LLM and ensemble:
   [design](docs/superpowers/specs/2026-10-27-p7-llm-ensemble-design.md),
   [plan](docs/superpowers/plans/2026-10-27-p7-llm-ensemble.md)). Tasks 1–6 of 9 are done.
+- **P8 started** (the medal push, approved 2026-10-30:
+  [design](docs/superpowers/specs/2026-10-30-p8-medal-push-design.md),
+  [plan](docs/superpowers/plans/2026-10-30-p8-medal-push.md)): our own strong models on
+  the whole clean pool, blended, for a top-10% finish. Tasks 1–2 of 9 are done:
+  - **the pinned pool** is the private dataset `ryqn00/name-that-llm-pool-v10`;
+  - **the weekly pool watch** (`pool-watch.yml`, Wednesdays) is on;
+  - **the honest pool member** (`pool_member.py`) trains once on the pool alone and
+    predicts all our passages.
+
+  P7's last tasks come first.
 - **P6** (the MLOps loop) was done on 2026-10-28:
   [plan](docs/superpowers/plans/2026-10-27-p6-mlops-loop.md),
   [journal](docs/journal/p6-mlops-loop.md),
@@ -335,31 +345,36 @@ CV = the seed-42 folds, the same for every row.
 State at the end of session 11 (2026-10-30):
 - **I-029's ensemble scored 0.454 on the public LB** (up from 0.410; ref 57813381, lib
   v0.9.0, the clean 3-source pool).
-- **Task 7:** seed 42's folds 0–3 are done; fold 4 waits for the weekly GPU reset.
+- **P7 Task 7:** seed 42's folds 0–3 are done; fold 4 is left.
+- **P8 is designed and planned** (the medal push), and its Tasks 1–2 are done (#69, #70).
 - **The demo's challenger was removed** (#66).
+- **The GPU quota resets weekly on Saturday 00:00 UTC** (`kaggle quota`; 30 GPU-hours, plus
+  20 TPU-hours we don't use).
 
-The ledger: `.superpowers/sdd/2026-10-27-p7-llm-ensemble/progress.md`.
+The ledgers: P7's `.superpowers/sdd/2026-10-27-p7-llm-ensemble/progress.md`, and P8's
+`.superpowers/sdd/2026-10-30-p8-medal-push/progress.md`. Both run natively
+(superpowers:executing-plans), and every Kaggle push, dataset, submission and tag needs
+the user's OK.
 
-1. **Register `ensemble_pool` as the champion**, so the local app serves it.
-   - `scripts/register_champion.py` must first fit `lr` with the pool.
-   - Do it with Task 8, so the registry gets the four-member ensemble directly.
-2. **Session 3: seed 42's fold 4**, about 4 GPU-hours, after the weekly reset (the user's
-   OK).
+1. **Session 3: seed 42's fold 4**, about 4 GPU-hours, now that the quota has reset (the
+   user's OK).
    - Push a new version of notebook 12 with `JOBS = [("seed42-f4", 42, (4,), {}, True)]`
      and a budget under the quota left.
    - **Keep folds 0–3's adapters:** they're in `data/kaggle-outputs/llm-final-s2`, and the
      new version replaces the kernel's outputs. The submission needs all 5, in one place:
      a private dataset, or a second kernel (I-034).
-3. **Task 7's gate on all 5 folds:** `python -I -X utf8 scripts/llm_ensemble_check.py
+2. **P7 Task 7's gate on all 5 folds:** `python -I -X utf8 scripts/llm_ensemble_check.py
    data/kaggle-outputs/llm-final-s2/runs <session 3's runs> --pool
-   data/pool/pool-v10-all.parquet`.
-4. **Task 8:** the four-member submission, with the LLM's inference in the submission
-   notebook (the plan's Task 8, now v0.10.0).
-5. **The bigger levers** (IDEAS):
-   - I-033: an encoder fine-tuned on the whole clean pool (the maintainer's DeBERTa-v3-large
-     scored 0.587 LB);
-   - I-032 and I-028: a label-balanced draw from the whole clean pool for `lr`;
-   - I-034: pin the pool.
+   data/pool/pool-v10-all.parquet`. Then P7 Task 7's config steps.
+3. **P7 Task 8:** the four-member submission, with the LLM's inference in the submission
+   notebook (now v0.10.0). Then register the new champion
+   (`scripts/register_champion.py` must first fit `lr` with the pool). Then P7 Task 9, its
+   journal.
+4. **P8 Task 3** (CPU, any time): the generalized gate, `blend.nested_blend_oof` and
+   `scripts/ensemble_gate.py`.
+5. **P8 Task 4:** DeBERTa-v3-large on the pool (notebook 13, private). It runs a speed probe,
+   then two seeds, one per T4, sized to the session (the user's OK for the push). Then the
+   rest of P8's plan.
 6. **Now and then:**
    - look at the dashboard;
    - answer "Do you know who wrote it?" on texts whose author you know;
