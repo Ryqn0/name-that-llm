@@ -58,6 +58,10 @@ class PoolSource(BaseModel):
     # None keeps them all. An allowlist, so a dataset added in a later version of the pool
     # stays out until it's checked (P6's weekly retraining downloads the latest version).
     include: list[str] | None = None
+    # The original datasets to drop even so (P8, spec §3): sources the public pool's
+    # maintainer removed after the release we pinned. New runs never train on them, while
+    # our pinned copy keeps every run comparable. Applied after `include`.
+    exclude: list[str] | None = None
 
 
 def load_pool_sources(name: str = "pool") -> list[PoolSource]:
@@ -198,6 +202,15 @@ def pool_for_fold(
     return allowed.reset_index(drop=True)
 
 
+def source_counts(pool: pd.DataFrame) -> dict[str, int]:
+    """Passages per original source, keys sorted: logged in every run (P8, spec §5.2).
+
+    In P7 the public pool lost 2 of our 5 sources between two runs, and only a total in a
+    log showed it. Per-source counts make such a change visible at a glance.
+    """
+    return {str(k): int(v) for k, v in sorted(pool["source"].value_counts().items())}
+
+
 def _source_files(root: Path, source: PoolSource) -> list[Path]:
     """The source's data files under `root`, inside a folder named after the dataset.
 
@@ -240,7 +253,8 @@ def build_pool(sources: Sequence[PoolSource], root: Path, train: pd.DataFrame) -
         if source.source_column:
             for name, part in raw.groupby(source.source_column, sort=True):
                 frames.append(clean_pool(part, str(name)))
-                if source.include is None or str(name) in source.include:
+                included = source.include is None or str(name) in source.include
+                if included and str(name) not in (source.exclude or []):
                     kept.add(str(name))
         else:
             frames.append(clean_pool(raw, source.slug))

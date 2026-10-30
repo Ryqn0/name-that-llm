@@ -1,0 +1,20 @@
+# The WHOLE clean pool (P8, spec §5.2), for the pool members: DeBERTa-v3-large and the LLM
+# trained on the pool alone.
+#   - slug: our PRIVATE pinned copy of crtproduction/name-that-llm-open-pool v10 (CC BY-SA
+#     4.0, 198,507 passages from 54 licence-checked sources). The public dataset changes
+#     upstream without notice, so every run trains on the same pinned release.
+#   - include: null keeps every source, since the maintainer's clean release already
+#     filtered quality, genre and licences. (`pool.yaml` keeps lr's 3-source allowlist.)
+#   - exclude: the sources the maintainer has dropped since v10. The weekly check
+#     (scripts/pool_release_check.py) fails when one disappears; then add it here, and new
+#     runs leave it out (spec §3). Members already trained on it are retrained only on proof
+#     that it breaks its licence.
+sources:
+- slug: ryqn00/name-that-llm-pool-v10
+  files: "*.parquet"
+  text: text
+  model: model
+  source_column: source_dataset
+  keep: true
+  include: null
+  exclude: []
