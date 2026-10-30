@@ -54,8 +54,14 @@ outputs are a public repo, a progress diary, and a live demo app.
     - a weekly export to DagsHub, Mondays (`weekly-export.yml`);
     - a weekly retraining that may propose a challenger by pull request, Sundays
       (`retrain.yml`);
-    - **shadow mode is on:** the challenger is `lr` + the pool (CV 0.4186; MLflow run
-      `f59454cd`, pinned in `app/demo/CHALLENGER_RUN`), and it scores each text silently.
+    - **shadow mode is off since 2026-10-30** (`app/demo/CHALLENGER_RUN` is empty).
+      - The last challenger, `lr` + the pool (MLflow run `f59454cd`, CV 0.4186), trained
+        on the pool's old version.
+      - That version included 2 sources its maintainer removed in the "clean" release.
+        Some removals were for licence or provenance risk, and nothing published says
+        which reason applied to ours.
+      - The weekly retraining reads the clean pool, so its next proposal brings back a
+        clean challenger.
   - **P7 so far:**
     - Sinkhorn balancing was dropped: its 95% CI includes 0 (I-027).
     - The pool of public generated passages is built, with its safeguards. With 30,000 of
