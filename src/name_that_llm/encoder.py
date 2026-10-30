@@ -20,7 +20,7 @@ import gc
 import math
 import re
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import numpy as np
@@ -72,9 +72,24 @@ def load_encoder(name_or_path: str | Path, device: str | None = None):
 
 
 def train_encoder(
-    model, tokenizer, texts: Sequence[str], y: np.ndarray, cfg: EncoderConfig | LLMConfig
+    model,
+    tokenizer,
+    texts: Sequence[str],
+    y: np.ndarray,
+    cfg: EncoderConfig | LLMConfig,
+    class_weight: np.ndarray | None = None,
+    on_epoch_end: Callable[[int], None] | None = None,
+    amp: bool = True,
 ) -> list[float]:
     """Fine-tune `model` in place on (texts, y); returns the mean training loss per epoch.
+
+    P8's pool members add three options:
+      - class_weight: (18,) loss weights in LABELS order, so every label weighs the same
+        (pool_member.label_weights). The pool's sources cover the 18 models very unevenly.
+      - on_epoch_end(epoch): called after each finished epoch (1, 2, ...), to save a
+        checkpoint, so a run that stops part-way keeps its last finished epoch.
+      - amp=False: float32 math on CUDA too, the fallback if float16 overflows (DeBERTa-v3
+        is known to, on T4s, which have no bfloat16).
 
     The recipe, step by step:
       - AdamW: Adam with weight decay applied correctly; the standard for transformers.
@@ -95,7 +110,12 @@ def train_encoder(
     import torch
 
     device = next(model.parameters()).device
-    use_amp = device.type == "cuda"
+    use_amp = device.type == "cuda" and amp
+    weight = (
+        None
+        if class_weight is None
+        else torch.as_tensor(class_weight, dtype=torch.float32, device=device)
+    )
     labels = torch.tensor([LABELS.index(v) for v in y])  # an unknown label raises ValueError
     total = cfg.epochs * math.ceil(len(texts) / cfg.batch_size)
     warmup = int(cfg.warmup_ratio * total)
@@ -129,7 +149,15 @@ def train_encoder(
                 return_tensors="pt",
             ).to(device)
             with torch.autocast(device.type, dtype=torch.float16, enabled=use_amp):
-                loss = model(**enc, labels=labels[idx].to(device)).loss  # cross-entropy
+                if weight is None:
+                    loss = model(**enc, labels=labels[idx].to(device)).loss  # cross-entropy
+                else:
+                    # The same cross-entropy, each row weighted by its label's weight. In
+                    # float32: a weighted sum of float16 terms loses precision.
+                    logits = model(**enc).logits.float()
+                    loss = torch.nn.functional.cross_entropy(
+                        logits, labels[idx].to(device), weight=weight
+                    )
             if not torch.isfinite(loss):
                 raise FloatingPointError(
                     f"non-finite loss at epoch {epoch}, batch {start // cfg.batch_size}"
@@ -143,6 +171,8 @@ def train_encoder(
             schedule.step()
             batch_losses.append(loss.item())
         losses.append(float(np.mean(batch_losses)))
+        if on_epoch_end is not None:
+            on_epoch_end(epoch + 1)
     return losses
 
 

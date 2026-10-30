@@ -76,6 +76,9 @@ class EncoderConfig(BaseModel):
     epochs: int = 3  # FIXED, never early-stopped on the validation fold (honest OOF)
     warmup_ratio: float = 0.1  # share of steps where the lr ramps up from 0
     weight_decay: float = 0.01  # mild L2-style shrinkage, the usual for AdamW fine-tuning
+    # Pool passages a POOL MEMBER trains on (P8, pool_member.py); 0 means all of the honest
+    # pool. Our P5 encoder ignores it: it trains on our passages, fold by fold.
+    pool_size: int = 0
     n_splits: int = 5
     seed: int = 42
 
