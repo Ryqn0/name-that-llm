@@ -20,6 +20,7 @@ from name_that_llm.pool import (
     match_prompts,
     normalize_label,
     pool_for_fold,
+    source_counts,
 )
 
 
@@ -168,3 +169,37 @@ def test_build_pool_keeps_only_included_original_sources(fake_train, tmp_path):
     pool = build_pool([source], tmp_path, fake_train)
     assert list(pool.source) == ["a/one"]
     assert list(pool.model) == ["kimi-k3"]
+
+
+def test_exclude_drops_a_source_even_with_every_source_included(fake_train, tmp_path):
+    # P8 (spec §3): the whole clean pool trains (include=None), minus the sources its
+    # maintainer dropped since our pinned copy. A dropped source must stay out even though
+    # our pinned copy still holds it, and even if a release re-adds it under the same name.
+    folder = tmp_path / "owner__fake-pool"
+    folder.mkdir()
+    a = "Sleep matters because the brain sorts the day's memories at night. "
+    b = "Tides follow the moon, whose pull raises the oceans on either side. "
+    pd.DataFrame(
+        {
+            "text": [a * 4, a * 5, b * 4, b * 5],
+            "model": ["kimi-k3", "gpt-5.5", "qwen3.8-max", "gemini-3.7-flash"],
+            "source_dataset": ["a/one", "a/one", "b/two", "b/two"],
+        }
+    ).to_parquet(folder / "pool.parquet")
+    source = PoolSource(
+        slug="owner/fake-pool",
+        files="*.parquet",
+        text="text",
+        model="model",
+        source_column="source_dataset",
+        include=None,
+        exclude=["b/two"],
+    )
+    pool = build_pool([source], tmp_path, fake_train)
+    assert set(pool["source"]) == {"a/one"}
+
+
+def test_source_counts():
+    # Logged in every run (spec §5.2): a source that silently shrinks or vanishes upstream
+    # shows up in the counts at once, as it didn't in P7.
+    assert source_counts(pd.DataFrame({"source": ["b", "a", "b"]})) == {"a": 1, "b": 2}
