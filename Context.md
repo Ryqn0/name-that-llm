@@ -140,25 +140,32 @@ outputs are a public repo, a progress diary, and a live demo app.
   - P4: hosting terms change, so check them early: free Docker Spaces disappeared behind a
     paywall. A model small enough for the browser costs nothing to serve. And look at the
     page: a headless browser found two layout bugs that every HTTP check had passed.
-- **Leaderboard snapshot, 2026-10-26:** 3,387 teams; median 0.532; top-10% cutoff 0.641;
-  best 0.710. With 0.410 we're about 2,236th (about 2,219th on 2026-10-25, with 0.389).
-- Champion: **`ensemble`** (since 2026-10-26), a weighted mean of three models'
-  probabilities, 0.70 / 0.15 / 0.15:
-  1. `lr`, the word + character TF-IDF logistic regression;
-  2. the LM head, a logistic regression on Qwen 3 4B base layers 6–9 (together with `lr`,
-     the previous champion `lm_blend`);
+  - P7: **the pool's gain held on the hidden prompts:** +0.049 in CV became **+0.044 on the
+    LB** (0.410 → 0.454), with a CV–LB gap of about −0.016. **A public dependency changes
+    silently:** the pool lost 2 of our sources between two runs, and only a count in a log
+    showed it (I-034).
+- **Leaderboard snapshot, 2026-10-30:** 3,954 teams; median 0.549; top-10% cutoff 0.658;
+  best 0.732. With 0.454 we're about 2,462nd (top 62%). On 2026-10-26: 3,387 teams, median
+  0.532, cutoff 0.641, and 0.410 was about 2,236th.
+- Champion: **`ensemble_pool`** (since 2026-10-30, public LB **0.454**), a weighted mean of
+  three models' probabilities, 0.75 / 0.10 / 0.15:
+  1. `lr`, the word + character TF-IDF logistic regression, trained on our passages plus
+     the clean pool's 28,048 (I-029);
+  2. the LM head, a logistic regression on Qwen 3 4B base layers 6–9;
   3. ModernBERT-base fine-tuned on our 18 labels: the average of its 5 fold models.
 
-  It beat `lm_blend` on fresh folds (+0.017 on seed 42, 95% CI [+0.004, +0.030]) and on the
-  public LB (0.410 vs 0.389). The offline submission runs it on a T4 GPU in about 30
-  minutes.
+  It beat `ensemble` (the same members, `lr` without the pool) on fresh folds (+0.049 on
+  seed 42, 95% CI [+0.032, +0.065]) and on the public LB (0.454 vs 0.410). The offline
+  submission runs it on a T4 GPU in about an hour. **The DagsHub registry, and so the local
+  app, still serve `ensemble` v1:** registering the new one needs
+  `scripts/register_champion.py` to fit `lr` with the pool.
 
 CV = the seed-42 folds, the same for every row.
 
 | date | model | CV | LB | W&B run |
 |---|---|---|---|---|
 | 2026-10-30 | lr + the clean pool's 3 allowlisted sources (28,048 passages) | 0.4338 | — | — |
-| 2026-10-29 | ensemble + pool (lr with 30,000 pool passages + LM head + ModernBERT, 0.75 / 0.10 / 0.15) | 0.4705 | pending | — |
+| 2026-10-30 | **ensemble_pool** (I-029: lr + the pool, LM head, ModernBERT; 0.75 / 0.10 / 0.15) | 0.4705 | **0.454** | — |
 | 2026-10-26 | **ensemble** (lr + LM head + ModernBERT, 0.70 / 0.15 / 0.15) | 0.4219 | **0.410** | — |
 | 2026-10-26 | encoder (ModernBERT-base, tuned) | 0.3501 | — | — |
 | 2026-10-25 | lm_blend (lr + Qwen 3 4B layers 6–9) | 0.4052 | **0.389** | — |
@@ -326,15 +333,16 @@ CV = the seed-42 folds, the same for every row.
 ## Next steps
 
 State at the end of session 11 (2026-10-30):
-- **I-029's ensemble is submitted** (ref 57813381, lib v0.9.0, the clean 3-source pool),
-  with its score pending.
+- **I-029's ensemble scored 0.454 on the public LB** (up from 0.410; ref 57813381, lib
+  v0.9.0, the clean 3-source pool).
 - **Task 7:** seed 42's folds 0–3 are done; fold 4 waits for the weekly GPU reset.
 - **The demo's challenger was removed** (#66).
 
 The ledger: `.superpowers/sdd/2026-10-27-p7-llm-ensemble/progress.md`.
 
-1. **The submission's score:** `kaggle competitions submissions name-that-llm`. Record it
-   in the CV table, and compare it with 0.410.
+1. **Register `ensemble_pool` as the champion**, so the local app serves it.
+   - `scripts/register_champion.py` must first fit `lr` with the pool.
+   - Do it with Task 8, so the registry gets the four-member ensemble directly.
 2. **Session 3: seed 42's fold 4**, about 4 GPU-hours, after the weekly reset (the user's
    OK).
    - Push a new version of notebook 12 with `JOBS = [("seed42-f4", 42, (4,), {}, True)]`
