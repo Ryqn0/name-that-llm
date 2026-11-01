@@ -4,13 +4,14 @@
   "code_file": "submit.ipynb",
   "language": "python",
   "kernel_type": "notebook",
-  "is_private": false,
+  "is_private": true,
   "enable_gpu": true,
   "enable_tpu": false,
   "enable_internet": false,
   "dataset_sources": [
     "ryqn00/name-that-llm-lib",
-    "crtproduction/name-that-llm-open-pool"
+    "crtproduction/name-that-llm-open-pool",
+    "ryqn00/name-that-llm-llm-adapters"
   ],
   "competition_sources": [
     "name-that-llm"
@@ -19,6 +20,7 @@
     "ryqn00/name-that-llm-encoder-final"
   ],
   "model_sources": [
-    "qwen-lm/qwen-3/transformers/4b-base/1"
+    "qwen-lm/qwen-3/transformers/4b-base/1",
+    "qwen-lm/qwen-3/transformers/8b-base/1"
   ]
 }
