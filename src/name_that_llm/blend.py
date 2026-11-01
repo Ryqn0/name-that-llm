@@ -91,3 +91,32 @@ def best_blend_weights(
         if s > best_score + 1e-12:  # strictly better only, so ties keep the earlier one
             best_weights, best_score = w, s
     return tuple(float(round(x, 4)) for x in best_weights), best_score
+
+
+def nested_blend_oof(
+    probas: Sequence[np.ndarray],
+    y: np.ndarray,
+    folds: np.ndarray,
+    rows: np.ndarray | None = None,
+    step: float = 0.05,
+) -> tuple[np.ndarray, dict[int, tuple[float, ...]]]:
+    """The blend's out-of-fold predictions, its weights chosen by NESTED cross-validation.
+
+    For each fold k among `rows`, the weights are chosen (best_blend_weights) on the OTHER
+    folds' rows only, then applied to fold k's rows. So no row is ever scored with weights
+    fitted on it: the honest way to weigh a member that exists on one seed only (P8's pool
+    members and the LLM), where weights can't be chosen on another seed as before.
+
+    Returns the blended probabilities (zeros outside `rows`) and each fold's weights.
+    """
+    y, folds = np.asarray(y), np.asarray(folds)
+    rows = np.ones(len(y), dtype=bool) if rows is None else np.asarray(rows, dtype=bool)
+    probas = [np.asarray(p, dtype=float) for p in probas]
+    out = np.zeros_like(probas[0])
+    weights = {}
+    for k in sorted(int(k) for k in np.unique(folds[rows])):
+        fit, target = rows & (folds != k), rows & (folds == k)
+        w, _ = best_blend_weights([p[fit] for p in probas], y[fit], step)
+        out[target] = blend([p[target] for p in probas], w)
+        weights[k] = tuple(w)
+    return out, weights

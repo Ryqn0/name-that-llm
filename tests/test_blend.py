@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from name_that_llm.blend import best_blend_weight, best_blend_weights, blend
+from name_that_llm.blend import best_blend_weight, best_blend_weights, blend, nested_blend_oof
 from name_that_llm.labels import LABELS
 from name_that_llm.metrics import score
 
@@ -76,3 +76,30 @@ def test_log_blend_is_a_normalized_geometric_mean():
     expected = np.sqrt(p1 * p2)
     np.testing.assert_allclose(out, expected / expected.sum(axis=1, keepdims=True))
     np.testing.assert_allclose(out.sum(axis=1), 1.0)
+
+
+def _members(seed=0):
+    """Two random members on 3 folds of 36 rows, each fold holding every label twice: a
+    fold missing a label would make balanced accuracy warn about it."""
+    rng = np.random.default_rng(seed)
+    y = np.array(LABELS * 6)
+    probas = [rng.dirichlet(np.ones(18), size=len(y)) for _ in range(2)]
+    return probas, y, np.repeat([0, 1, 2], 36)
+
+
+def test_nested_blend_oof_chooses_each_folds_weights_elsewhere():
+    # P8 Task 3: a member that exists on one seed only gets its weights by nested CV. Each
+    # fold's weights must come from the OTHER folds' rows only, or its score is flattered.
+    probas, y, folds = _members()
+    _, weights = nested_blend_oof(probas, y, folds)
+    for k in (0, 1, 2):
+        rest = folds != k
+        assert weights[k] == best_blend_weights([p[rest] for p in probas], y[rest])[0]
+
+
+def test_nested_blend_oof_leaves_rows_outside_untouched():
+    # Rows whose fold isn't done (e.g. an LLM fold still training) get no prediction.
+    probas, y, folds = _members()
+    out, weights = nested_blend_oof(probas, y, folds, rows=folds < 2)
+    assert set(weights) == {0, 1}
+    assert not out[folds == 2].any() and out[folds < 2].sum(axis=1) == pytest.approx(1.0)
