@@ -112,7 +112,7 @@ outputs are a public repo, a progress diary, and a live demo app.
         because of class imbalance (I-032).
     - **Task 7, session 2:** seed-42 folds 0–3 are done (0.461, 0.458, 0.496, 0.457), with
       their adapters kept in `data/kaggle-outputs/llm-final-s2`. Fold 4 is left.
-    - **The four-member preview** (seed 42, folds 0–3, `scripts/llm_ensemble_check.py`,
+    - **The four-member preview** (seed 42, folds 0–3, now `scripts/ensemble_gate.py`,
       weights chosen on the other folds): 0.5159 against I-029's 0.4705 (+0.045, 95% CI
       [+0.030, +0.062]). Weights 0.60 / 0.15 / 0.00 / 0.25: the encoder drops out.
   - **The free public demo is live:** <https://huggingface.co/spaces/Ryqn/name-that-llm>.
@@ -363,9 +363,10 @@ the user's OK.
    - **Keep folds 0–3's adapters:** they're in `data/kaggle-outputs/llm-final-s2`, and the
      new version replaces the kernel's outputs. The submission needs all 5, in one place:
      a private dataset, or a second kernel (I-034).
-2. **P7 Task 7's gate on all 5 folds:** `python -I -X utf8 scripts/llm_ensemble_check.py
-   data/kaggle-outputs/llm-final-s2/runs <session 3's runs> --pool
-   data/pool/pool-v10-all.parquet`. Then P7 Task 7's config steps.
+2. **P7 Task 7's gate on all 5 folds:** `python -I -X utf8 scripts/ensemble_gate.py
+   --llm-runs data/kaggle-outputs/llm-final-s2/runs <session 3's runs> --baseline
+   lr_pool,lm,enc --candidate lr_pool,lm,enc,llm`. Both sides get nested weights. On
+   folds 0-3, the LLM adds +0.034 (95% CI [+0.020, +0.047]) to a re-weighted 0.4821. Then P7 Task 7's config steps.
 3. **P7 Task 8:** the four-member submission, with the LLM's inference in the submission
    notebook (now v0.10.0). Then register the new champion
    (`scripts/register_champion.py` must first fit `lr` with the pool). Then P7 Task 9, its
