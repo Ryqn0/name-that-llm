@@ -156,10 +156,10 @@ def test_llm_final_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_path,
     run_notebook(NOTEBOOKS / "12-llm-final" / "llm_final.ipynb", env, monkeypatch)
 
     results = pd.read_csv(work / "results.csv")
-    assert list(results["name"]) == ["seed42-f01", "seed42-f23", "seed42-f4"]  # all fit here
+    assert list(results["name"]) == ["seed42-f4"]  # session 3: fold 4 only
     assert set(results["epochs"]) == {2} and set(results["seed"]) == {42}
     summary = json.loads((work / "results.json").read_text())
-    assert summary == {"seed": 42, "folds_done": [0, 1, 2, 3, 4], "folds_left": []}
-    for job, k in [("seed42-f01", 0), ("seed42-f01", 1), ("seed42-f23", 3), ("seed42-f4", 4)]:
+    assert summary == {"seed": 42, "folds_done": [4], "folds_left": [0, 1, 2, 3]}
+    for job, k in [("seed42-f4", 4)]:
         assert np.load(work / "runs" / job / f"fold{k}.npz")[f"fold{k}"].shape[1] == 18
         assert (work / "adapters" / job / f"fold{k}" / "adapter_config.json").exists()
