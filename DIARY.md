@@ -2,6 +2,30 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-11-01 · Session 12: the last LLM fold, and DeBERTa on the whole pool
+
+**Did**
+- **The last LLM fold (fold 4) is training** on Kaggle (notebook 12, session 3).
+- **P7's ensemble code:**
+  - the LLM as a fourth member, the log blend and Sinkhorn (#73, #74);
+  - the submit notebook's LLM step, private.
+- **P8 Task 3, the nested gate (#75).** On folds 0–3, the LLM adds +0.034 over a re-weighted
+  three-member ensemble (0.4821 → 0.5159).
+- **P8 Task 4, notebook 13 (#76):** DeBERTa-v3-large on the whole pinned pool, pushed. It
+  trains alongside fold 4.
+
+**Learned**
+- **Kaggle runs two GPU sessions at once:** the LLM's fold and DeBERTa train in parallel.
+- **Weigh the baseline the same way as the candidate.** With both weighted by nested CV, the
+  LLM's real gain is +0.034, not +0.045.
+- **A test can pass for the wrong reason, again:** an unknown field also raises a
+  ValidationError. Match the error's message.
+
+**Next**
+- Download both runs, then run the five-fold gate.
+- The four-member submission, with your OKs.
+- DeBERTa's gate.
+
 ## 2026-10-30 · Session 11: 0.454 on the leaderboard, and a pool that changed under us
 
 **Did**
