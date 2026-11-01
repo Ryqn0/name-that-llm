@@ -163,3 +163,37 @@ def test_llm_final_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_path,
     for job, k in [("seed42-f4", 4)]:
         assert np.load(work / "runs" / job / f"fold{k}.npz")[f"fold{k}"].shape[1] == 18
         assert (work / "adapters" / job / f"fold{k}" / "adapter_config.json").exists()
+
+
+def test_pool_deberta_notebook_runs(tiny_encoder, fake_data_dir, fake_train, tmp_path, monkeypatch):
+    # Notebook 13 (P8 Task 4): DeBERTa-v3-large trained once on the honest pool, two seeds
+    # (one per T4), sized by a speed probe. Here a tiny DeBERTa-style model on CPU, on a fake
+    # copy of the pinned pool.
+    pytest.importorskip("torch")
+    import pandas as pd
+
+    inp = tmp_path / "input"
+    inp.mkdir()
+    fake_open_pool(inp)
+    (inp / "name-that-llm-open-pool").rename(inp / "name-that-llm-pool-v10")  # the pin's name
+    work = tmp_path / "working"
+    work.mkdir()
+    config = tmp_path / "deberta_pool.yaml"
+    tiny = dict(name="deberta_pool", base_model=str(tiny_encoder), max_length=64, batch_size=8)
+    tiny |= dict(lr=5e-3, epochs=2)
+    config.write_text(yaml.safe_dump(tiny), encoding="utf-8")
+    env = {
+        "NTL_INPUT": str(inp),
+        "NTL_WORK": str(work),
+        "NTL_ENCODER_CONFIG": str(config),
+        "NTL_DATA_DIR": str(fake_data_dir),
+    }
+    run_notebook(NOTEBOOKS / "13-pool-deberta" / "pool_deberta.ipynb", env, monkeypatch)
+
+    results = json.loads((work / "results.json").read_text())
+    assert set(results["scores"]) == {"42", "43", "mean"}
+    assert all(0 <= s <= 1 for s in results["scores"].values())
+    for seed in (42, 43):
+        assert np.load(work / "runs" / f"seed{seed}.npz")["train"].shape == (len(fake_train), 18)
+    counts = json.loads((work / "pool_counts.json").read_text())
+    assert sum(counts.values()) == len(pd.read_parquet(work / "pool.parquet"))
