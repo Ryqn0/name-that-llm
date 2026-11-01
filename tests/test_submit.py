@@ -151,3 +151,50 @@ def test_predict_submission_ensemble_needs_its_pool(fake_train):
     test = pd.DataFrame({"id": ["a"], "text": ["some passage"]})
     with pytest.raises(ValueError, match="pass the pool"):
         _pool_ensemble(fake_train, test, text_pool=40, pool=None)
+
+
+def _llm_ensemble(fake_train, fake_data_dir, p_llm, alpha=0.0, weights=(0.01, 0.01, 0.01, 0.97)):
+    """predict_submission_ensemble with a 4-member config (P7 Task 8)."""
+    test = load_test(fake_data_dir)
+    rng = np.random.default_rng(0)
+    return predict_submission_ensemble(
+        _cfg(),
+        BlendConfig(name="b", lm_variation="x", layer=0, weight=0.5),
+        EnsembleConfig(name="e", weights=weights, llm="llm", sinkhorn_alpha=alpha),
+        fake_train,
+        test,
+        rng.normal(size=(len(fake_train), 8)),
+        rng.normal(size=(len(test), 8)),
+        rng.dirichlet(np.ones(18), size=len(test)),
+        p_llm=p_llm,
+    )
+
+
+def test_ensemble_submission_with_an_llm_member(fake_train, fake_data_dir):
+    # The LLM joins as a fourth member: a one-hot p_llm holding 0.97 of the weight decides
+    # every row.
+    test = load_test(fake_data_dir)
+    picks = [LABELS[i] for i in (4, 9, 13)]
+    p_llm = np.zeros((len(test), 18))
+    p_llm[np.arange(len(test)), [LABELS.index(p) for p in picks]] = 1.0
+    sub = _llm_ensemble(fake_train, fake_data_dir, p_llm)
+    assert list(sub["id"]) == list(test["id"]) and sub["model"].tolist() == picks
+
+
+def test_ensemble_submission_applies_sinkhorn(fake_train, fake_data_dir):
+    # When the LLM favors one label everywhere, full balancing spreads the predictions.
+    test = load_test(fake_data_dir)
+    p_llm = np.full((len(test), 18), 0.01)
+    p_llm[:, 0] = 1.0
+    p_llm /= p_llm.sum(axis=1, keepdims=True)
+    plain = _llm_ensemble(fake_train, fake_data_dir, p_llm, alpha=0.0)
+    balanced = _llm_ensemble(fake_train, fake_data_dir, p_llm, alpha=1.0)
+    assert balanced["model"].nunique() > plain["model"].nunique()
+
+
+def test_llm_probabilities_of_the_wrong_shape_are_refused(fake_train, fake_data_dir):
+    test = load_test(fake_data_dir)
+    with pytest.raises(ValueError, match="llm"):
+        _llm_ensemble(fake_train, fake_data_dir, np.full((len(test), 17), 1 / 17))
+    with pytest.raises(ValueError, match="llm"):
+        _llm_ensemble(fake_train, fake_data_dir, None)  # the config has an llm member

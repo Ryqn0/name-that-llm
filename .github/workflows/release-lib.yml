@@ -35,6 +35,16 @@ jobs:
           uvx pip download --no-deps --dest dist-kaggle
           pandera typeguard typing-inspect mypy-extensions
 
+      # P7: the LLM member needs peft (LoRA) and bitsandbytes (the 4-bit weights), which
+      # Kaggle's image lacks, and the offline notebook can't fetch. bitsandbytes ships
+      # compiled code, so pip is asked for the wheel Kaggle's machine runs: Linux x86-64,
+      # Python 3.13. --no-deps: torch, transformers and accelerate come with Kaggle's GPU
+      # image. If one ever doesn't, the notebook's first cell stops and names it.
+      - run: >-
+          uvx pip download --no-deps --dest dist-kaggle --only-binary=:all:
+          --platform manylinux_2_24_x86_64 --python-version 3.13
+          peft bitsandbytes
+
       - run: cp kaggle/lib-dataset/dataset-metadata.json dist-kaggle/
 
       # A new dataset VERSION replaces the previous file set. The token lives in the
