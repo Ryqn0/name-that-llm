@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from name_that_llm.assign import assign_labels
+from name_that_llm.balance import sinkhorn_balance
 from name_that_llm.blend import blend
 from name_that_llm.config import BlendConfig, EnsembleConfig, ExperimentConfig
 from name_that_llm.grouping import topic_groups
@@ -115,8 +116,14 @@ def predict_submission_ensemble(
     lm_test: np.ndarray,
     p_encoder: np.ndarray,
     pool: pd.DataFrame | None = None,
+    p_llm: np.ndarray | None = None,
 ) -> pd.DataFrame:
     """The P5 submission: the text model, the LM head and a fine-tuned encoder, blended.
+
+    P7 adds a fourth member: `p_llm` holds the LoRA'd LLM's (n_test, 18) probabilities (the
+    mean of its fold adapters, computed in the notebook like the encoder's), required when
+    `ens_cfg.llm` is set. The blend follows `ens_cfg.log_blend`, and `ens_cfg.sinkhorn_alpha`
+    > 0 then balances the predictions (I-015, I-027).
 
     `p_encoder` holds the encoder's (n_test, 18) probabilities: the mean of its 5 fold
     models (encoder.predict_proba_folds). The notebook computes it, so this module stays
@@ -141,6 +148,19 @@ def predict_submission_ensemble(
         extra = pool_for_fold(pool, set(), ens_cfg.text_pool, seed=text_cfg.seed)
         columns = ["text", "model"]
         text_train = pd.concat([train[columns], extra[columns]], ignore_index=True)
+    members = []
+    if ens_cfg.llm is not None:
+        # Checked before the slow fits: a missing or misaligned LLM would otherwise be
+        # discovered only after minutes of training.
+        if p_llm is None or np.shape(p_llm) != expected:
+            shape = None if p_llm is None else np.shape(p_llm)
+            raise ValueError(f"the llm member's probabilities have shape {shape}, not {expected}")
+        members = [p_llm]
+    elif p_llm is not None:
+        raise ValueError(f"p_llm given, but {ens_cfg.name} has no llm member")
     p_text = predict_proba_test(text_cfg, text_train, test)
     p_lm = _lm_proba(blend_cfg.C, train, lm_train, lm_test)
-    return _submission(blend([p_text, p_lm, p_encoder], ens_cfg.weights), test)
+    proba = blend([p_text, p_lm, p_encoder, *members], ens_cfg.weights, log=ens_cfg.log_blend)
+    if ens_cfg.sinkhorn_alpha > 0:
+        proba = sinkhorn_balance(proba, ens_cfg.sinkhorn_alpha)
+    return _submission(proba, test)
