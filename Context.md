@@ -42,7 +42,8 @@ outputs are a public repo, a progress diary, and a live demo app.
 - **P8 started** (the medal push, approved 2026-10-30:
   [design](docs/superpowers/specs/2026-10-30-p8-medal-push-design.md),
   [plan](docs/superpowers/plans/2026-10-30-p8-medal-push.md)): our own strong models on
-  the whole clean pool, blended, for a top-10% finish. Tasks 1–2 of 9 are done:
+  the whole clean pool, blended, for a top-10% finish. Tasks 1–3 of 9 are done, and
+  Task 4 (DeBERTa) is training:
   - **the pinned pool** is the private dataset `ryqn00/name-that-llm-pool-v10`;
   - **the weekly pool watch** (`pool-watch.yml`, Wednesdays) is on;
   - **the honest pool member** (`pool_member.py`) trains once on the pool alone and
@@ -342,40 +343,44 @@ CV = the seed-42 folds, the same for every row.
 
 ## Next steps
 
-State at the end of session 11 (2026-10-30):
-- **I-029's ensemble scored 0.454 on the public LB** (up from 0.410; ref 57813381, lib
-  v0.9.0, the clean 3-source pool).
-- **P7 Task 7:** seed 42's folds 0–3 are done; fold 4 is left.
-- **P8 is designed and planned** (the medal push), and its Tasks 1–2 are done (#69, #70).
-- **The demo's challenger was removed** (#66).
-- **The GPU quota resets weekly on Saturday 00:00 UTC** (`kaggle quota`; 30 GPU-hours, plus
-  20 TPU-hours we don't use).
+State at the end of session 12 (2026-11-01):
+- **Two GPU runs are training on Kaggle at once:**
+  - P7's fold 4 (notebook 12, version 4, pushed 20:31);
+  - P8's DeBERTa-v3-large on the pinned pool (notebook 13, version 1, pushed 23:45, at most
+    10.5 h).
+- **Done this session:**
+  - P7 Task 7's config (#73) and Task 8's code (#74): `p_llm`, the log blend, Sinkhorn, and the
+    `peft` and `bitsandbytes` wheels. Version 0.10.0, not yet tagged.
+  - P8 Task 3, the nested gate (#75), and Task 4's notebook 13 (#76).
+- **The submit notebook's LLM step** is on the branch `p7-08b-submit-notebook`, pushed but
+  not merged: it needs `configs/ensemble_llm.yaml`.
+- **The GPU quota:** 28.4 hours left before the runs, which reset on Saturday 2026-11-07,
+  00:00 UTC.
 
 The ledgers: P7's `.superpowers/sdd/2026-10-27-p7-llm-ensemble/progress.md`, and P8's
-`.superpowers/sdd/2026-10-30-p8-medal-push/progress.md`. Both run natively
-(superpowers:executing-plans), and every Kaggle push, dataset, submission and tag needs
-the user's OK.
+`.superpowers/sdd/2026-10-30-p8-medal-push/progress.md`. Every Kaggle push, dataset,
+submission and tag needs the user's OK.
 
-1. **Session 3: seed 42's fold 4**, about 4 GPU-hours, now that the quota has reset (the
-   user's OK).
-   - Push a new version of notebook 12 with `JOBS = [("seed42-f4", 42, (4,), {}, True)]`
-     and a budget under the quota left.
-   - **Keep folds 0–3's adapters:** they're in `data/kaggle-outputs/llm-final-s2`, and the
-     new version replaces the kernel's outputs. The submission needs all 5, in one place:
-     a private dataset, or a second kernel (I-034).
-2. **P7 Task 7's gate on all 5 folds:** `python -I -X utf8 scripts/ensemble_gate.py
-   --llm-runs data/kaggle-outputs/llm-final-s2/runs <session 3's runs> --baseline
-   lr_pool,lm,enc --candidate lr_pool,lm,enc,llm`. Both sides get nested weights. On
-   folds 0-3, the LLM adds +0.034 (95% CI [+0.020, +0.047]) to a re-weighted 0.4821. Then P7 Task 7's config steps.
-3. **P7 Task 8:** the four-member submission, with the LLM's inference in the submission
-   notebook (now v0.10.0). Then register the new champion
-   (`scripts/register_champion.py` must first fit `lr` with the pool). Then P7 Task 9, its
-   journal.
-4. **P8 Task 3** (CPU, any time): the generalized gate, `blend.nested_blend_oof` and
-   `scripts/ensemble_gate.py`.
-5. **P8 Task 4:** DeBERTa-v3-large on the pool (notebook 13, private). It runs a speed probe,
-   then two seeds, one per T4, sized to the session (the user's OK for the push). Then the
-   rest of P8's plan.
+1. **Download both runs, and log them to W&B** (`scripts/log_gpu_run.py`):
+   - `kaggle kernels output ryqn00/name-that-llm-llm-final -p data/kaggle-outputs/llm-final-s3`;
+   - `kaggle kernels output ryqn00/name-that-llm-pool-deberta -p data/kaggle-outputs/pool-deberta`.
+2. **P7's gate on all 5 folds:** `python -I -X utf8 scripts/ensemble_gate.py --llm-runs
+   data/kaggle-outputs/llm-final-s2/runs data/kaggle-outputs/llm-final-s3/runs --baseline
+   lr_pool,lm,enc --candidate lr_pool,lm,enc,llm`.
+   - On folds 0–3 it gave +0.034 (95% CI [+0.020, +0.047]) over a re-weighted 0.4821.
+   - If it passes, write `configs/ensemble_llm.yaml`: the weights to ship, `llm: llm`,
+     `text_pool: 30000`. Add it to `p7-08b-submit-notebook`, then ship.
+3. **The four-member submission** (P7 Task 8). Each step needs the user's OK:
+   - the private dataset `ryqn00/name-that-llm-llm-adapters`, with `llm/fold0` to `fold4`
+     (folds 0–3 from `llm-final-s2/adapters`, fold 4 from `llm-final-s3/adapters`);
+   - the tag `v0.10.0`;
+   - pushing the submit notebook, then submitting.
+
+   Then register the new champion, and write P7's journal (Task 9).
+4. **P8 Task 4's gate:** the four-member baseline plus `--extra
+   deberta=data/kaggle-outputs/pool-deberta/mean.npy`. Ledger the verdict, and fill in
+   notebook 13's Findings. Then P8 Task 5 onward.
+5. **Kaggle runs two GPU sessions at once**, so the next runs can overlap too.
 6. **Now and then:**
    - look at the dashboard;
    - answer "Do you know who wrote it?" on texts whose author you know;
