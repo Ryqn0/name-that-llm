@@ -108,3 +108,30 @@ def test_shipped_pool_member_configs_load():
     deberta = load_config("deberta_pool", model_cls=EncoderConfig)
     assert deberta.base_model == "microsoft/deberta-v3-large"
     assert load_config("llm_pool", model_cls=LLMConfig).pool_size == 18_000
+
+
+def test_ensemble_config_accepts_three_or_four_members():
+    # P7 Task 7: the LLM joins as a fourth member, with a fourth weight.
+    assert EnsembleConfig(name="e", weights=(0.5, 0.2, 0.3)).llm is None
+    assert EnsembleConfig(name="e", weights=(0.6, 0.15, 0.0, 0.25), llm="llm").llm == "llm"
+
+
+def test_ensemble_config_rejects_a_weight_count_mismatch():
+    # Matched on the message: an unknown field also raises a ValidationError, and that must
+    # not pass for this check.
+    with pytest.raises(ValidationError, match="expected 3 weights"):
+        EnsembleConfig(name="e", weights=(0.25, 0.25, 0.25, 0.25))  # 4 weights, no llm
+    with pytest.raises(ValidationError, match="expected 4 weights"):
+        EnsembleConfig(name="e", weights=(0.5, 0.2, 0.3), llm="llm")  # llm, 3 weights
+
+
+def test_ensemble_config_rejects_alpha_outside_0_1():
+    with pytest.raises(ValidationError, match="less than or equal to 1"):
+        EnsembleConfig(name="e", weights=(0.5, 0.2, 0.3), sinkhorn_alpha=1.5)
+
+
+def test_shipped_ensemble_config_still_loads():
+    # The 0.410 and 0.454 ensembles keep their meaning: no LLM, no balancing, a plain mean.
+    for name in ("ensemble", "ensemble_pool"):
+        cfg = load_config(name, model_cls=EnsembleConfig)
+        assert cfg.llm is None and cfg.sinkhorn_alpha == 0 and cfg.log_blend is False

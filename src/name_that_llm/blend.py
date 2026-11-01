@@ -18,13 +18,27 @@ from name_that_llm.labels import LABELS
 from name_that_llm.metrics import score
 
 
-def blend(probas: Sequence[np.ndarray], weights: Sequence[float]) -> np.ndarray:
-    """Weighted arithmetic mean of (n, 18) probability matrices; weights are normalized."""
+def blend(probas: Sequence[np.ndarray], weights: Sequence[float], log: bool = False) -> np.ndarray:
+    """Weighted mean of (n, 18) probability matrices; weights are normalized.
+
+    log=False: the arithmetic mean, our blend since P3b.
+    log=True (I-015, P7 Task 7): the weighted GEOMETRIC mean, renormalized so each row sums
+    to 1. A member sure that a label is wrong then vetoes it, where the plain mean only
+    dilutes it. Probabilities are floored at 1e-12, so a single 0 can't wipe a row out.
+    """
     w = np.asarray(weights, dtype=float)
     if len(w) != len(probas) or (w < 0).any() or w.sum() == 0:
         raise ValueError(f"need one non-negative weight per model, not all zero; got {weights}")
     w = w / w.sum()
-    return sum(wi * np.asarray(p, dtype=float) for wi, p in zip(w, probas, strict=True))
+    if not log:
+        return sum(wi * np.asarray(p, dtype=float) for wi, p in zip(w, probas, strict=True))
+    logs = sum(
+        wi * np.log(np.clip(np.asarray(p, dtype=float), 1e-12, 1.0))
+        for wi, p in zip(w, probas, strict=True)
+    )
+    # Subtracting each row's max before exp keeps the numbers in range; it cancels out.
+    out = np.exp(logs - logs.max(axis=1, keepdims=True))
+    return out / out.sum(axis=1, keepdims=True)
 
 
 def best_blend_weight(

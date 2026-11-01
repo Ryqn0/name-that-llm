@@ -65,3 +65,14 @@ def test_best_blend_weight_prefers_the_informative_source():
     weight, score = best_blend_weight(bad, good, y)
     assert weight > 0 and score == 1.0
     assert best_blend_weight(good, bad, y)[0] == 0.0  # tie -> the smaller weight
+
+
+def test_log_blend_is_a_normalized_geometric_mean():
+    # I-015 (P7 Task 7): the log form is a weighted geometric mean, renormalized. A member
+    # sure that a label is wrong then vetoes it, where the plain mean only dilutes it.
+    p1 = np.array([[0.7, 0.2, 0.1], [0.1, 0.1, 0.8]])
+    p2 = np.array([[0.4, 0.4, 0.2], [0.3, 0.3, 0.4]])
+    out = blend([p1, p2], [0.5, 0.5], log=True)
+    expected = np.sqrt(p1 * p2)
+    np.testing.assert_allclose(out, expected / expected.sum(axis=1, keepdims=True))
+    np.testing.assert_allclose(out.sum(axis=1), 1.0)
