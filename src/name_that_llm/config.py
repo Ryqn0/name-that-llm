@@ -11,7 +11,14 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, NonNegativeFloat, NonNegativeInt
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    NonNegativeFloat,
+    NonNegativeInt,
+    model_validator,
+)
 
 
 class ExperimentConfig(BaseModel):
@@ -125,12 +132,26 @@ class EnsembleConfig(BaseModel):
     name: str
     blend: str = "lm_blend"  # the BlendConfig whose text model and LM head are reused
     encoder: str = "encoder"  # the EncoderConfig of the fine-tuned encoder
-    # text model, LM head, encoder, in that order. blend() normalizes them to sum to 1.
-    weights: tuple[NonNegativeFloat, NonNegativeFloat, NonNegativeFloat]
+    # text model, LM head, encoder, [llm], in that order. blend() normalizes them to sum to 1.
+    weights: tuple[NonNegativeFloat, ...]
     # Pool passages the text model also trains on (I-029: 30,000 lifted the ensemble by
     # +0.049 on seed 42). 0: our passages only, as in P5. The LM head and the encoder never
     # see the pool.
     text_pool: NonNegativeInt = 0
+    # P7 Task 7: the LoRA'd LLM as a fourth member (the LLMConfig's name), with a 4th weight.
+    llm: str | None = None
+    # Sinkhorn balancing of the final probabilities (I-027): 0 = off. Rechecked with the LLM.
+    sinkhorn_alpha: float = Field(0.0, ge=0.0, le=1.0)
+    # The weighted geometric mean instead of the arithmetic one (I-015, blend(log=True)).
+    log_blend: bool = False
+
+    @model_validator(mode="after")
+    def _one_weight_per_member(self) -> "EnsembleConfig":
+        expected = 3 + (self.llm is not None)
+        if len(self.weights) != expected:
+            members = "text, LM head, encoder" + (", llm" if self.llm else "")
+            raise ValueError(f"expected {expected} weights ({members}), got {len(self.weights)}")
+        return self
 
 
 def load_config(name_or_path: str | Path, model_cls: type[BaseModel] = ExperimentConfig):
