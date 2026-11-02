@@ -103,3 +103,21 @@ def test_nested_blend_oof_leaves_rows_outside_untouched():
     out, weights = nested_blend_oof(probas, y, folds, rows=folds < 2)
     assert set(weights) == {0, 1}
     assert not out[folds == 2].any() and out[folds < 2].sum(axis=1) == pytest.approx(1.0)
+
+
+def test_best_blend_weights_can_search_the_log_blend():
+    # P7 Task 7 (I-015): the log blend's weights must be chosen FOR it, since a member's
+    # confidence counts differently there; the best probability weights needn't be its best.
+    y, probas = _random_problem(3)
+    w, s = best_blend_weights(probas, y, log=True)
+    assert s == score(y, np.asarray(LABELS)[blend(probas, w, log=True).argmax(axis=1)])
+
+
+def test_nested_blend_oof_can_blend_in_log_space():
+    probas, y, folds = _members()
+    out, weights = nested_blend_oof(probas, y, folds, log=True)
+    for k in (0, 1, 2):
+        rest, here = folds != k, folds == k
+        fit = best_blend_weights([p[rest] for p in probas], y[rest], log=True)[0]
+        assert weights[k] == fit
+        np.testing.assert_allclose(out[here], blend([p[here] for p in probas], fit, log=True))

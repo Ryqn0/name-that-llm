@@ -62,7 +62,7 @@ def best_blend_weight(
 
 
 def best_blend_weights(
-    probas: Sequence[np.ndarray], y: np.ndarray, step: float = 0.05
+    probas: Sequence[np.ndarray], y: np.ndarray, step: float = 0.05, log: bool = False
 ) -> tuple[tuple[float, ...], float]:
     """The weights, one per model, with the best balanced accuracy: (weights, score).
 
@@ -73,6 +73,9 @@ def best_blend_weights(
     Ties go to the SMALLEST weight on the LATER models: list the incumbents first and the
     newcomer last, and a newcomer that adds nothing gets weight 0. For two models this is
     exactly best_blend_weight's rule.
+
+    log=True searches the log blend's weights (blend(log=True)): a member's confidence
+    counts differently there, so its best weights needn't be the probability blend's.
     """
     n = round(1 / step)
     if n < 1 or abs(n * step - 1) > 1e-9:
@@ -87,7 +90,7 @@ def best_blend_weights(
         if rest < 0:
             continue  # the weights would sum to more than 1
         w = np.array([rest, *reversed(idx)]) / n
-        s = score(y, labels[blend(probas, w).argmax(axis=1)])
+        s = score(y, labels[blend(probas, w, log=log).argmax(axis=1)])
         if s > best_score + 1e-12:  # strictly better only, so ties keep the earlier one
             best_weights, best_score = w, s
     return tuple(float(round(x, 4)) for x in best_weights), best_score
@@ -99,6 +102,7 @@ def nested_blend_oof(
     folds: np.ndarray,
     rows: np.ndarray | None = None,
     step: float = 0.05,
+    log: bool = False,
 ) -> tuple[np.ndarray, dict[int, tuple[float, ...]]]:
     """The blend's out-of-fold predictions, its weights chosen by NESTED cross-validation.
 
@@ -107,6 +111,7 @@ def nested_blend_oof(
     fitted on it: the honest way to weigh a member that exists on one seed only (P8's pool
     members and the LLM), where weights can't be chosen on another seed as before.
 
+    log=True blends in log space, its weights chosen for it (best_blend_weights).
     Returns the blended probabilities (zeros outside `rows`) and each fold's weights.
     """
     y, folds = np.asarray(y), np.asarray(folds)
@@ -116,7 +121,7 @@ def nested_blend_oof(
     weights = {}
     for k in sorted(int(k) for k in np.unique(folds[rows])):
         fit, target = rows & (folds != k), rows & (folds == k)
-        w, _ = best_blend_weights([p[fit] for p in probas], y[fit], step)
-        out[target] = blend([p[target] for p in probas], w)
+        w, _ = best_blend_weights([p[fit] for p in probas], y[fit], step, log)
+        out[target] = blend([p[target] for p in probas], w, log=log)
         weights[k] = tuple(w)
     return out, weights

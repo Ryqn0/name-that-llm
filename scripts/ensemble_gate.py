@@ -26,6 +26,10 @@ Usage (repo root):
       [--extra NAME=PATH.npy ...] [--baseline lr_pool,lm,enc,llm] [--candidate NAMES]
 P7's gate (the LLM against I-029's three members):
   ... --baseline lr_pool,lm,enc --candidate lr_pool,lm,enc,llm
+P7's choices for the shipped blend (the same members, a different form):
+  ... --baseline M --candidate M --candidate-log          (I-015: the log blend)
+  ... --baseline M --candidate M --candidate-sinkhorn A   (I-027: Sinkhorn at strength A)
+Sinkhorn balances all scored rows at once, as the submission does the whole test.
 """
 
 import argparse
@@ -34,6 +38,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from name_that_llm.balance import sinkhorn_balance
 from name_that_llm.blend import best_blend_weights, nested_blend_oof
 from name_that_llm.config import BlendConfig, EnsembleConfig, load_config
 from name_that_llm.cv import make_folds
@@ -54,6 +59,10 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--extra", action="append", default=[], help="NAME=PATH.npy, repeatable")
     parser.add_argument("--baseline", default=",".join(STANDARD), help="member names")
     parser.add_argument("--candidate", help="member names (default: baseline + extras)")
+    parser.add_argument("--candidate-log", action="store_true", help="blend it in log space")
+    parser.add_argument(
+        "--candidate-sinkhorn", type=float, default=0.0, help="Sinkhorn's strength, in [0, 1]"
+    )
     parser.add_argument("--pool", type=Path, default=Path("data/pool/pool-v10-all.parquet"))
     parser.add_argument(
         "--lm-features-dir", type=Path, default=Path("data/kaggle-outputs/lm-features")
@@ -129,15 +138,21 @@ def main(argv=None) -> None:
     for name in used:
         print(f"  {name} alone: {acc(members[name]):.4f}")
     base_oof, _ = nested_blend_oof([members[m] for m in base], y, folds, rows)
-    cand_oof, cand_w = nested_blend_oof([members[m] for m in cand], y, folds, rows)
+    cand_oof, cand_w = nested_blend_oof(
+        [members[m] for m in cand], y, folds, rows, log=args.candidate_log
+    )
+    if args.candidate_sinkhorn:
+        cand_oof[rows] = sinkhorn_balance(cand_oof[rows], args.candidate_sinkhorn)
     for k, w in cand_w.items():
         print(f"fold {k}: candidate weights {w}")
     print(f"\nbaseline {'+'.join(base)}: {acc(base_oof):.4f}")
-    print(f"candidate {'+'.join(cand)}: {acc(cand_oof):.4f}")
+    form = " (log)" if args.candidate_log else ""
+    form += f" (Sinkhorn {args.candidate_sinkhorn})" if args.candidate_sinkhorn else ""
+    print(f"candidate {'+'.join(cand)}{form}: {acc(cand_oof):.4f}")
     old, new = (LABEL_ARRAY[p[rows].argmax(axis=1)] for p in (base_oof, cand_oof))
     diff, lo, hi = prompt_bootstrap_ci(y[rows], old, new, prompts[rows])
     print(f"gain {diff:+.4f}, prompt bootstrap 95% CI [{lo:+.4f}, {hi:+.4f}]")
-    final, _ = best_blend_weights([members[m][rows] for m in cand], y[rows])
+    final, _ = best_blend_weights([members[m][rows] for m in cand], y[rows], log=args.candidate_log)
     print(f"the weights to ship ({', '.join(cand)}): {final}")
     preview = "" if len(done) == 5 else f" (a preview: {len(done)} of 5 folds)"
     print(f"\nVERDICT: {'PROMOTE' if lo > 0 else 'KEEP'} (gate: lower bound > 0){preview}")

@@ -1,0 +1,21 @@
+# P7's four-member ensemble (Task 7): I-029's three members plus the LLM, Qwen3-8B base with
+# LoRA on 4-bit weights, trained with 5,000 pool passages per fold (notebook 12, seed 42).
+# Chosen by scripts/ensemble_gate.py on the seed-42 folds (2026-11-02). Every weight comes
+# from nested CV (each fold's weights chosen on the other four), so no score is in-sample:
+#   - the LLM as a fourth member: 0.5108 against the three's 0.4819 (+0.0289, prompt
+#     bootstrap 95% CI [+0.0159, +0.0415]);
+#   - the log blend (I-015), its weights searched for it: 0.5246 against 0.5108 (+0.0137,
+#     CI [+0.0030, +0.0238]). A member sure that a model did NOT write a passage can veto it;
+#   - Sinkhorn at Task 1's 0.75 (I-027): +0.0063, CI [-0.0023, +0.0141], so it stays off.
+# The weights, chosen in log space on all five folds: 0.50 / 0.05 / 0.10 / 0.35.
+name: ensemble_llm
+blend: lm_blend
+encoder: encoder
+llm: llm
+text_pool: 30000
+log_blend: true
+weights:  # text, LM head, encoder, LLM
+- 0.5
+- 0.05
+- 0.1
+- 0.35
