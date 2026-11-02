@@ -2,6 +2,46 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-11-02 · Session 13: the LLM joins the ensemble, and three silent upstream changes
+
+**Did**
+- **The last LLM fold** scored 0.480. All five folds give 0.4705 out of fold, our best
+  single member (W&B `llm-final`).
+- **P7's gate on all five folds: PROMOTE.**
+  - The LLM as a fourth member: 0.4819 → 0.5108.
+  - A log blend, its weights searched for it: **0.5246** (#80).
+  - Sinkhorn failed its gate again, so it stays off.
+- **The four-member submission:**
+  - v0.10.0 released, with the `peft` and `bitsandbytes` wheels;
+  - the private adapters dataset, in its second version: the first put the folds at the
+    root, where the notebook doesn't look;
+  - version 6 ran out of GPU memory in its runtime check (#85 fixes it);
+  - version 7's run estimated 138 minutes for the hidden test, and it's submitted.
+- **DeBERTa:**
+  - v1 ran out of GPU memory 8 minutes into training;
+  - v3 trains at batch 4, and its probe steps on the worst batch first (#78, #79);
+  - it also leaves out a source the pool dropped (#82, #84). v2 still held that source,
+    so it's to be cancelled.
+
+**Learned**
+- **Probe the worst case, not the average.** 256 random pool passages, mostly short, never
+  formed a batch of long ones. The full run did, at minute 8.
+- **A pinned version isn't a pinned environment.** python-dateutil 4.0 dropped `six`, which
+  kaggle 2.2.5 imports without declaring it. Sunday's retraining failed on it, and the
+  release would have too (I-035).
+- **A gate's number holds only for the data it measured.** The pool's 2026-11-01 release
+  would have changed `lr`'s training set under the submission. The notebook now reads the
+  pin, and stops unless the count is the measured 28,048.
+- **GPU memory can't be tested on CPU.** The runtime check caught two models on one T4.
+  The hidden test would have failed the same way, hours in.
+
+**Scores:** the LLM alone 0.4705 (five folds); `ensemble_llm` 0.5246 (nested CV). The LB is
+pending.
+
+**Next**
+- The submission's score, then P7's last task: the journal, and the final review.
+- DeBERTa v3, then its gate.
+
 ## 2026-11-01 · Session 12: the last LLM fold, and DeBERTa on the whole pool
 
 **Did**

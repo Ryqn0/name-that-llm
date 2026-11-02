@@ -38,16 +38,22 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 - Phase: **P7 in progress** (LLM and ensemble:
   [design](docs/superpowers/specs/2026-10-27-p7-llm-ensemble-design.md),
-  [plan](docs/superpowers/plans/2026-10-27-p7-llm-ensemble.md)). Tasks 1–6 of 9 are done.
+  [plan](docs/superpowers/plans/2026-10-27-p7-llm-ensemble.md)). Tasks 1–7 of 9 are done,
+  and Task 8, the four-member submission, is submitted and scoring.
 - **P8 started** (the medal push, approved 2026-10-30:
   [design](docs/superpowers/specs/2026-10-30-p8-medal-push-design.md),
   [plan](docs/superpowers/plans/2026-10-30-p8-medal-push.md)): our own strong models on
-  the whole clean pool, blended, for a top-10% finish. Tasks 1–3 of 9 are done, and
-  Task 4 (DeBERTa) is training:
-  - **the pinned pool** is the private dataset `ryqn00/name-that-llm-pool-v10`;
+  the whole clean pool, blended, for a top-10% finish. Tasks 1–3 of 9 are done:
+  - **the pinned pool** is the private dataset `ryqn00/name-that-llm-pool-v10`, minus the
+    sources later releases dropped (`configs/pool_all.yaml`'s `exclude`);
   - **the weekly pool watch** (`pool-watch.yml`, Wednesdays) is on;
   - **the honest pool member** (`pool_member.py`) trains once on the pool alone and
     predicts all our passages.
+  - **Task 4, DeBERTa-v3-large on the pool (notebook 13):**
+    - v1 ran out of GPU memory 8 minutes into training, at batch 8;
+    - v2 still held a source the 2026-11-01 release dropped, so it's to be cancelled;
+    - v3, ready on main, trains at batch 4. Its probe steps on the worst batch first, and
+      the run doesn't start if that batch takes over 85% of the GPU.
 
   P7's last tasks come first.
 - **P6** (the MLOps loop) was done on 2026-10-28:
@@ -111,11 +117,28 @@ outputs are a public repo, a progress diary, and a live demo app.
       - **The clean 3-source pool is better for `lr`:** 0.4338 against 0.4205 (seed 42).
       - 28,048 passages drawn from all 54 clean sources score only 0.3623, probably
         because of class imbalance (I-032).
-    - **Task 7, session 2:** seed-42 folds 0–3 are done (0.461, 0.458, 0.496, 0.457), with
-      their adapters kept in `data/kaggle-outputs/llm-final-s2`. Fold 4 is left.
-    - **The four-member preview** (seed 42, folds 0–3, now `scripts/ensemble_gate.py`,
-      weights chosen on the other folds): 0.5159 against I-029's 0.4705 (+0.045, 95% CI
-      [+0.030, +0.062]). Weights 0.60 / 0.15 / 0.00 / 0.25: the encoder drops out.
+    - **Task 7 is done (2026-11-02).** The LLM's five folds (seed 42) scored 0.461, 0.458,
+      0.496, 0.457 and 0.480: 0.4705 out of fold, our best single member (W&B `llm-final`).
+      The gate (`scripts/ensemble_gate.py`), every weight by nested CV:
+      - the LLM as a fourth member: 0.4819 → **0.5108** (+0.029, 95% CI [+0.016, +0.042]);
+      - **the log blend** (I-015), its weights searched for it: **0.5246** (+0.014 more,
+        CI [+0.003, +0.024]);
+      - Sinkhorn (I-027) failed its gate again (+0.006, CI [−0.002, +0.014]), so it's off;
+      - so `configs/ensemble_llm.yaml` is a log blend, weighted 0.50 / 0.05 / 0.10 / 0.35.
+    - **Task 8, the four-member submission:**
+      - v0.10.0 is released, and the five fold adapters are the private dataset
+        `ryqn00/name-that-llm-llm-adapters`;
+      - the notebook reads `lr`'s pool from the pinned v10, and stops unless it holds the
+        measured 28,048 passages;
+      - version 6 ran out of GPU memory: the LM-features model stayed loaded beside the LLM.
+        #85 frees it after each use, and version 7 is the one to submit.
+    - **The public pool changed again (2026-11-01):**
+      - one source was dropped, so new runs leave it out (#82);
+      - eight shrank, `lr`'s `drjcfmd` among them;
+      - `prvsiyan` came back.
+    - **The Kaggle CLI broke in CI (I-035):** python-dateutil 4.0 dropped `six`, which
+      kaggle 2.2.5 imports without declaring it. Sunday's weekly retraining failed, and
+      `--with six` on every call fixed it (#81).
   - **The free public demo is live:** <https://huggingface.co/spaces/Ryqn/name-that-llm>.
     It's a static Space: the page runs `lr` in the visitor's browser (`app/demo/ntl.js`,
     parity-tested against scikit-learn), so the text never leaves the device. Its model is
@@ -154,7 +177,10 @@ outputs are a public repo, a progress diary, and a live demo app.
   - P7: **the pool's gain held on the hidden prompts:** +0.049 in CV became **+0.044 on the
     LB** (0.410 → 0.454), with a CV–LB gap of about −0.016. **A public dependency changes
     silently:** the pool lost 2 of our sources between two runs, and only a count in a log
-    showed it (I-034).
+    showed it (I-034). **A pinned version isn't a pinned environment either** (I-035).
+    **Probe the worst case, not the average:** DeBERTa's probe trained on 256 random, mostly
+    short passages, and its run met the rare batch of long ones. **GPU memory can't be
+    tested on CPU:** the submission's runtime check caught two models sharing one T4.
 - **Leaderboard snapshot, 2026-10-30:** 3,954 teams; median 0.549; top-10% cutoff 0.658;
   best 0.732. With 0.454 we're about 2,462nd (top 62%). On 2026-10-26: 3,387 teams, median
   0.532, cutoff 0.641, and 0.410 was about 2,236th.
@@ -175,6 +201,8 @@ CV = the seed-42 folds, the same for every row.
 
 | date | model | CV | LB | W&B run |
 |---|---|---|---|---|
+| 2026-11-02 | **ensemble_llm** (P7: + the LLM, a log blend; 0.50 / 0.05 / 0.10 / 0.35; nested weights) | 0.5246 | pending | — |
+| 2026-11-02 | llm (Qwen3-8B base, LoRA on 4 bits, 5,000 pool passages per fold) | 0.4705 | — | 4i8ru6ex |
 | 2026-10-30 | lr + the clean pool's 3 allowlisted sources (28,048 passages) | 0.4338 | — | — |
 | 2026-10-30 | **ensemble_pool** (I-029: lr + the pool, LM head, ModernBERT; 0.75 / 0.10 / 0.15) | 0.4705 | **0.454** | — |
 | 2026-10-26 | **ensemble** (lr + LM head + ModernBERT, 0.70 / 0.15 / 0.15) | 0.4219 | **0.410** | — |
@@ -343,44 +371,34 @@ CV = the seed-42 folds, the same for every row.
 
 ## Next steps
 
-State at the end of session 12 (2026-11-01):
-- **Two GPU runs are training on Kaggle at once:**
-  - P7's fold 4 (notebook 12, version 4, pushed 20:31);
-  - P8's DeBERTa-v3-large on the pinned pool (notebook 13, version 1, pushed 23:45, at most
-    10.5 h).
-- **Done this session:**
-  - P7 Task 7's config (#73) and Task 8's code (#74): `p_llm`, the log blend, Sinkhorn, and the
-    `peft` and `bitsandbytes` wheels. Version 0.10.0, not yet tagged.
-  - P8 Task 3, the nested gate (#75), and Task 4's notebook 13 (#76).
-- **The submit notebook's LLM step** is on the branch `p7-08b-submit-notebook`, pushed but
-  not merged: it needs `configs/ensemble_llm.yaml`.
-- **The GPU quota:** 28.4 hours left before the runs, which reset on Saturday 2026-11-07,
-  00:00 UTC.
+State at the end of session 13 (2026-11-02):
+- **The four-member submission is scoring:** ref 57913980, submitted 16:53. Its hidden run
+  takes about 2 h 20 min. Compare it with 0.454.
+- **DeBERTa v2 was still running** at the session's end, with a source the pool dropped. It
+  must be cancelled on its Kaggle page. v3 is ready on main (#84), and the user approved
+  pushing it once v2 is cancelled.
+- **The GPU quota:** 22.8 hours left at 16:54. It resets on Saturday 2026-11-07, 00:00 UTC.
 
 The ledgers: P7's `.superpowers/sdd/2026-10-27-p7-llm-ensemble/progress.md`, and P8's
 `.superpowers/sdd/2026-10-30-p8-medal-push/progress.md`. Every Kaggle push, dataset,
 submission and tag needs the user's OK.
 
-1. **Download both runs, and log them to W&B** (`scripts/log_gpu_run.py`):
-   - `kaggle kernels output ryqn00/name-that-llm-llm-final -p data/kaggle-outputs/llm-final-s3`;
-   - `kaggle kernels output ryqn00/name-that-llm-pool-deberta -p data/kaggle-outputs/pool-deberta`.
-2. **P7's gate on all 5 folds:** `python -I -X utf8 scripts/ensemble_gate.py --llm-runs
-   data/kaggle-outputs/llm-final-s2/runs data/kaggle-outputs/llm-final-s3/runs --baseline
-   lr_pool,lm,enc --candidate lr_pool,lm,enc,llm`.
-   - On folds 0–3 it gave +0.034 (95% CI [+0.020, +0.047]) over a re-weighted 0.4821.
-   - If it passes, write `configs/ensemble_llm.yaml`: the weights to ship, `llm: llm`,
-     `text_pool: 30000`. Add it to `p7-08b-submit-notebook`, then ship.
-3. **The four-member submission** (P7 Task 8). Each step needs the user's OK:
-   - the private dataset `ryqn00/name-that-llm-llm-adapters`, with `llm/fold0` to `fold4`
-     (folds 0–3 from `llm-final-s2/adapters`, fold 4 from `llm-final-s3/adapters`);
-   - the tag `v0.10.0`;
-   - pushing the submit notebook, then submitting.
-
-   Then register the new champion, and write P7's journal (Task 9).
-4. **P8 Task 4's gate:** the four-member baseline plus `--extra
-   deberta=data/kaggle-outputs/pool-deberta/mean.npy`. Ledger the verdict, and fill in
-   notebook 13's Findings. Then P8 Task 5 onward.
-5. **Kaggle runs two GPU sessions at once**, so the next runs can overlap too.
+1. **The submission's score** (`kaggle competitions submissions name-that-llm`):
+   - ledger it, with the CV–LB gap against 0.5246, and fill in Context's table;
+   - if it beats 0.454, `ensemble_llm` is the champion. The registry and the local app run
+     on CPU (ADR 0004), and an 8B LLM doesn't fit there: decide what they serve.
+2. **P7 Task 9:**
+   - P7's journal, from its ledger (ADR 0006 is written);
+   - then the final review: a fresh reviewer reads P7's whole range, then one fix pass;
+   - then delete P7's workspace.
+3. **DeBERTa v3:**
+   - once v2 is cancelled: `kaggle kernels push -p notebooks/13-pool-deberta` (approved);
+   - after its 11 hours: download it to `data/kaggle-outputs/pool-deberta-v3`, then log it
+     to W&B;
+   - then its gate, `--extra deberta=.../mean.npy`. The champion now blends in log space,
+     so the gate first needs a `--log` option for both sides (it has `--candidate-log`).
+4. **P8 Task 5 onward:** the submission with pool members.
+5. **Kaggle runs two GPU sessions at once**, so runs can overlap.
 6. **Now and then:**
    - look at the dashboard;
    - answer "Do you know who wrote it?" on texts whose author you know;
@@ -389,7 +407,6 @@ submission and tag needs the user's OK.
    required). The retraining's token can write to the repo, and protection keeps main
    reachable through reviewed, tested pull requests only.
 8. Cheap follow-ups:
-   - I-015: a calibrated or log blend, in P7 Task 7;
    - I-017: TF without IDF;
    - I-018: the weight grid inside each Optuna trial;
    - I-020 and I-022: encoder tuning (more epochs, and the noise floor);
