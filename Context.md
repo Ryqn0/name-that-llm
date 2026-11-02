@@ -38,8 +38,9 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 - Phase: **P7 in progress** (LLM and ensemble:
   [design](docs/superpowers/specs/2026-10-27-p7-llm-ensemble-design.md),
-  [plan](docs/superpowers/plans/2026-10-27-p7-llm-ensemble.md)). Tasks 1–7 of 9 are done,
-  and Task 8, the four-member submission, is submitted and scoring.
+  [plan](docs/superpowers/plans/2026-10-27-p7-llm-ensemble.md)). Tasks 1–8 of 9 are done:
+  the four-member submission scored **public LB 0.505**. Task 9 (the journal and the final
+  review) is left.
 - **P8 started** (the medal push, approved 2026-10-30:
   [design](docs/superpowers/specs/2026-10-30-p8-medal-push-design.md),
   [plan](docs/superpowers/plans/2026-10-30-p8-medal-push.md)): our own strong models on
@@ -131,7 +132,9 @@ outputs are a public repo, a progress diary, and a live demo app.
       - the notebook reads `lr`'s pool from the pinned v10, and stops unless it holds the
         measured 28,048 passages;
       - version 6 ran out of GPU memory: the LM-features model stayed loaded beside the LLM.
-        #85 frees it after each use, and version 7 is the one to submit.
+        #85 frees it after each use, and version 7 ran cleanly;
+      - **it scored public LB 0.505** (+0.051 over 0.454, against +0.054 in CV):
+        `ensemble_llm` is the champion.
     - **The public pool changed again (2026-11-01):**
       - one source was dropped, so new runs leave it out (#82);
       - eight shrank, `lr`'s `drjcfmd` among them;
@@ -181,27 +184,33 @@ outputs are a public repo, a progress diary, and a live demo app.
     **Probe the worst case, not the average:** DeBERTa's probe trained on 256 random, mostly
     short passages, and its run met the rare batch of long ones. **GPU memory can't be
     tested on CPU:** the submission's runtime check caught two models sharing one T4.
-- **Leaderboard snapshot, 2026-10-30:** 3,954 teams; median 0.549; top-10% cutoff 0.658;
-  best 0.732. With 0.454 we're about 2,462nd (top 62%). On 2026-10-26: 3,387 teams, median
-  0.532, cutoff 0.641, and 0.410 was about 2,236th.
-- Champion: **`ensemble_pool`** (since 2026-10-30, public LB **0.454**), a weighted mean of
-  three models' probabilities, 0.75 / 0.10 / 0.15:
+    **The LLM's gain held too:** +0.054 in CV became **+0.051 on the LB** (0.454 → 0.505),
+    and the CV–LB gap widened a little, to −0.020: watch it.
+- **Leaderboard snapshot, 2026-11-02:** 4,339 teams; median 0.556; top-10% cutoff 0.663;
+  best 0.744. With 0.505 we're 2,532nd (top 58%), 0.158 short of the cutoff. On 2026-10-30:
+  3,954 teams, median 0.549, cutoff 0.658, and 0.454 was about 2,462nd.
+- Champion: **`ensemble_llm`** (since 2026-11-02, public LB **0.505**), a log blend (a
+  weighted geometric mean) of four models' probabilities, 0.50 / 0.05 / 0.10 / 0.35:
   1. `lr`, the word + character TF-IDF logistic regression, trained on our passages plus
-     the clean pool's 28,048 (I-029);
+     the clean pool's 28,048 (I-029), read from the pinned v10;
   2. the LM head, a logistic regression on Qwen 3 4B base layers 6–9;
-  3. ModernBERT-base fine-tuned on our 18 labels: the average of its 5 fold models.
+  3. ModernBERT-base fine-tuned on our 18 labels: the average of its 5 fold models;
+  4. the LLM, Qwen3-8B base with LoRA on 4 bits and 5,000 pool passages per fold: the
+     average of its 5 fold adapters (ADR 0006).
 
-  It beat `ensemble` (the same members, `lr` without the pool) on fresh folds (+0.049 on
-  seed 42, 95% CI [+0.032, +0.065]) and on the public LB (0.454 vs 0.410). The offline
-  submission runs it on a T4 GPU in about an hour. **The DagsHub registry, and so the local
-  app, still serve `ensemble` v1:** registering the new one needs
+  On seed 42, every weight chosen by nested CV, the LLM lifted the first three from 0.4819
+  to 0.5108, and the log blend to 0.5246 (each gain's 95% CI above 0). On the public LB:
+  0.454 → 0.505. The offline submission runs it on two T4s, an estimated 2 h 20 min.
+  **The DagsHub registry, and so the local app, still serve `ensemble` v1 on CPU:** the
+  LLM needs a CUDA GPU, so the served model and the leaderboard's champion now differ
+  (ADR 0004, amended). Serving `ensemble_pool` (LB 0.454, CPU) needs
   `scripts/register_champion.py` to fit `lr` with the pool.
 
 CV = the seed-42 folds, the same for every row.
 
 | date | model | CV | LB | W&B run |
 |---|---|---|---|---|
-| 2026-11-02 | **ensemble_llm** (P7: + the LLM, a log blend; 0.50 / 0.05 / 0.10 / 0.35; nested weights) | 0.5246 | pending | — |
+| 2026-11-02 | **ensemble_llm** (P7: + the LLM, a log blend; 0.50 / 0.05 / 0.10 / 0.35; nested weights) | 0.5246 | **0.505** | — |
 | 2026-11-02 | llm (Qwen3-8B base, LoRA on 4 bits, 5,000 pool passages per fold) | 0.4705 | — | 4i8ru6ex |
 | 2026-10-30 | lr + the clean pool's 3 allowlisted sources (28,048 passages) | 0.4338 | — | — |
 | 2026-10-30 | **ensemble_pool** (I-029: lr + the pool, LM head, ModernBERT; 0.75 / 0.10 / 0.15) | 0.4705 | **0.454** | — |
@@ -371,42 +380,41 @@ CV = the seed-42 folds, the same for every row.
 
 ## Next steps
 
-State at the end of session 13 (2026-11-02):
-- **The four-member submission is scoring:** ref 57913980, submitted 16:53. Its hidden run
-  takes about 2 h 20 min. Compare it with 0.454.
-- **DeBERTa v2 was still running** at the session's end, with a source the pool dropped. It
-  must be cancelled on its Kaggle page. v3 is ready on main (#84), and the user approved
-  pushing it once v2 is cancelled.
-- **The GPU quota:** 22.8 hours left at 16:54. It resets on Saturday 2026-11-07, 00:00 UTC.
+State on 2026-11-02 at 20:05 (session 13, continued):
+- **The four-member submission scored 0.505** (ref 57913980): `ensemble_llm` is the
+  champion.
+- **DeBERTa v2 was still running at 20:01**, with a source the pool dropped. It must be
+  cancelled on its Kaggle page. v3 is ready on main (#84), and the user approved pushing it
+  once v2 is cancelled.
+- **The GPU quota:** about 19.7 hours left (22.8 at 16:54, minus v2's run since). It resets
+  on Saturday 2026-11-07, 00:00 UTC.
 
 The ledgers: P7's `.superpowers/sdd/2026-10-27-p7-llm-ensemble/progress.md`, and P8's
 `.superpowers/sdd/2026-10-30-p8-medal-push/progress.md`. Every Kaggle push, dataset,
 submission and tag needs the user's OK.
 
-1. **The submission's score** (`kaggle competitions submissions name-that-llm`):
-   - ledger it, with the CV–LB gap against 0.5246, and fill in Context's table;
-   - if it beats 0.454, `ensemble_llm` is the champion. The registry and the local app run
-     on CPU (ADR 0004), and an 8B LLM doesn't fit there: decide what they serve.
-2. **P7 Task 9:**
+1. **P7 Task 9:**
    - P7's journal, from its ledger (ADR 0006 is written);
    - then the final review: a fresh reviewer reads P7's whole range, then one fix pass;
    - then delete P7's workspace.
-3. **DeBERTa v3:**
+2. **DeBERTa v3:**
    - once v2 is cancelled: `kaggle kernels push -p notebooks/13-pool-deberta` (approved);
    - after its 11 hours: download it to `data/kaggle-outputs/pool-deberta-v3`, then log it
      to W&B;
    - then its gate, `--extra deberta=.../mean.npy`. The champion now blends in log space,
      so the gate first needs a `--log` option for both sides (it has `--candidate-log`).
-4. **P8 Task 5 onward:** the submission with pool members.
-5. **Kaggle runs two GPU sessions at once**, so runs can overlap.
-6. **Now and then:**
+3. **P8 Task 5 onward:** the submission with pool members.
+4. **Kaggle runs two GPU sessions at once**, so runs can overlap.
+5. **Now and then:**
    - look at the dashboard;
    - answer "Do you know who wrote it?" on texts whose author you know;
    - weekly: the retraining may open a challenger PR, which is a person's decision.
-7. **Suggested, your setting:** branch protection on main (pull requests only, CI
+6. **Suggested, your setting:** branch protection on main (pull requests only, CI
    required). The retraining's token can write to the repo, and protection keeps main
    reachable through reviewed, tested pull requests only.
-8. Cheap follow-ups:
+7. Cheap follow-ups:
+   - serve `ensemble_pool` (LB 0.454) in the registry and the local app, by fitting `lr`
+     with the pool in `scripts/register_champion.py`;
    - I-017: TF without IDF;
    - I-018: the weight grid inside each Optuna trial;
    - I-020 and I-022: encoder tuning (more epochs, and the noise floor);

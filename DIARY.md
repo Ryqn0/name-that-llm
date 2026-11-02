@@ -16,7 +16,7 @@ Newest entry first. Each entry follows the same format: **Did / Learned / Scores
   - the private adapters dataset, in its second version: the first put the folds at the
     root, where the notebook doesn't look;
   - version 6 ran out of GPU memory in its runtime check (#85 fixes it);
-  - version 7's run estimated 138 minutes for the hidden test, and it's submitted.
+  - version 7's run estimated 138 minutes for the hidden test, and it scored **0.505**.
 - **DeBERTa:**
   - v1 ran out of GPU memory 8 minutes into training;
   - v3 trains at batch 4, and its probe steps on the worst batch first (#78, #79);
@@ -35,11 +35,12 @@ Newest entry first. Each entry follows the same format: **Did / Learned / Scores
 - **GPU memory can't be tested on CPU.** The runtime check caught two models on one T4.
   The hidden test would have failed the same way, hours in.
 
-**Scores:** the LLM alone 0.4705 (five folds); `ensemble_llm` 0.5246 (nested CV). The LB is
-pending.
+**Scores:** the LLM alone 0.4705 (five folds); `ensemble_llm` 0.5246 (nested CV) and
+**public LB 0.505** (0.454 before; CV–LB gap −0.020). That's 2,532nd of 4,339 teams (top
+58%); the top 10% starts at 0.663.
 
 **Next**
-- The submission's score, then P7's last task: the journal, and the final review.
+- P7's last task: the journal, and the final review.
 - DeBERTa v3, then its gate.
 
 ## 2026-11-01 · Session 12: the last LLM fold, and DeBERTa on the whole pool
