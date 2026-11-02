@@ -22,6 +22,16 @@ Newest entry first. Each entry follows the same format: **Did / Learned / Scores
   - v3 trains at batch 4, and its probe steps on the worst batch first (#78, #79);
   - it also leaves out a source the pool dropped (#82, #84). v2 still held that source,
     so it's to be cancelled.
+- **P7's final review** (a fresh reviewer, the whole phase): "with fixes", nothing
+  Critical. The fix pass (#89):
+  - notebook 11, public on Kaggle, had the pool among its outputs. The notebooks now write
+    the pool to a scratch folder, and 09 and 11 are private in their metadata (switching
+    them on Kaggle is the user's);
+  - a test that the submission blends in log space;
+  - `lr`'s allowlist names only the 3 measured sources: one of the 2 removed ones came back
+    upstream, and Sunday's retraining would have trained on it unseen.
+- **P7's journal** ([docs/journal/p7-llm-ensemble.md](docs/journal/p7-llm-ensemble.md)),
+  and P7 is done.
 
 **Learned**
 - **Probe the worst case, not the average.** 256 random pool passages, mostly short, never
@@ -34,14 +44,20 @@ Newest entry first. Each entry follows the same format: **Did / Learned / Scores
   pin, and stops unless the count is the measured 28,048.
 - **GPU memory can't be tested on CPU.** The runtime check caught two models on one T4.
   The hidden test would have failed the same way, hours in.
+- **A public notebook publishes its outputs.** Everything under `/kaggle/working` becomes a
+  download for anyone.
+- **Compare like with like.** The LLM's step was +0.052 in CV between the two submitted
+  recipes, not the +0.054 first written: that compared it with a recipe measured on a pool
+  that had since changed. Like for like, the CV–LB gap held (−0.019, then −0.020).
 
 **Scores:** the LLM alone 0.4705 (five folds); `ensemble_llm` 0.5246 (nested CV) and
 **public LB 0.505** (0.454 before; CV–LB gap −0.020). That's 2,532nd of 4,339 teams (top
 58%); the top 10% starts at 0.663.
 
 **Next**
-- P7's last task: the journal, and the final review.
-- DeBERTa v3, then its gate.
+- Switch notebooks 09 and 11 to private on Kaggle (the user's).
+- DeBERTa v3 (once v2 is cancelled, and with an OK on #89's change), then its gate.
+- P8 Task 5, with four leftovers from P7's review.
 
 ## 2026-11-01 · Session 12: the last LLM fold, and DeBERTa on the whole pool
 

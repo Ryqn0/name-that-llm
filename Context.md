@@ -36,12 +36,16 @@ outputs are a public repo, a progress diary, and a live demo app.
 
 ## Status
 
-- Phase: **P7 in progress** (LLM and ensemble:
-  [design](docs/superpowers/specs/2026-10-27-p7-llm-ensemble-design.md),
-  [plan](docs/superpowers/plans/2026-10-27-p7-llm-ensemble.md)). Tasks 1–8 of 9 are done:
-  the four-member submission scored **public LB 0.505**. Task 9 (the journal and the final
-  review) is left.
-- **P8 started** (the medal push, approved 2026-10-30:
+- **P7** (the LLM and the ensemble) was done on 2026-11-02:
+  [plan](docs/superpowers/plans/2026-10-27-p7-llm-ensemble.md),
+  [journal](docs/journal/p7-llm-ensemble.md),
+  [ADR 0006](docs/adr/0006-generated-data-and-lora.md). The four-member submission scored
+  **public LB 0.505**, and the final review's fixes shipped in #89.
+  - **Your action:** switch two Kaggle notebooks to private on their pages (Settings →
+    Sharing). 11 (`name-that-llm-llm-explore`) has the pool among its outputs, and 09
+    (`name-that-llm-encoder-final`) the encoder's weights. Their metadata now says private.
+    Don't Quick Save them: the submit notebook attaches 09's outputs.
+- **P8 in progress** (the medal push, approved 2026-10-30:
   [design](docs/superpowers/specs/2026-10-30-p8-medal-push-design.md),
   [plan](docs/superpowers/plans/2026-10-30-p8-medal-push.md)): our own strong models on
   the whole clean pool, blended, for a top-10% finish. Tasks 1–3 of 9 are done:
@@ -54,9 +58,8 @@ outputs are a public repo, a progress diary, and a live demo app.
     - v1 ran out of GPU memory 8 minutes into training, at batch 8;
     - v2 still held a source the 2026-11-01 release dropped, so it's to be cancelled;
     - v3, ready on main, trains at batch 4. Its probe steps on the worst batch first, and
-      the run doesn't start if that batch takes over 85% of the GPU.
-
-  P7's last tasks come first.
+      the run doesn't start if that batch takes over 85% of the GPU. Since #89, it also
+      keeps the pool out of its outputs.
 - **P6** (the MLOps loop) was done on 2026-10-28:
   [plan](docs/superpowers/plans/2026-10-27-p6-mlops-loop.md),
   [journal](docs/journal/p6-mlops-loop.md),
@@ -80,7 +83,7 @@ outputs are a public repo, a progress diary, and a live demo app.
         which reason applied to ours.
       - The weekly retraining reads the clean pool, so its next proposal brings back a
         clean challenger.
-  - **P7 so far:**
+  - **P7, in detail:**
     - Sinkhorn balancing was dropped: its 95% CI includes 0 (I-027).
     - The pool of public generated passages is built, with its safeguards. With 30,000 of
       its passages, `lr` alone goes from CV 0.3212 to **0.4205** (+0.099, 95% CI [+0.080,
@@ -133,7 +136,7 @@ outputs are a public repo, a progress diary, and a live demo app.
         measured 28,048 passages;
       - version 6 ran out of GPU memory: the LM-features model stayed loaded beside the LLM.
         #85 frees it after each use, and version 7 ran cleanly;
-      - **it scored public LB 0.505** (+0.051 over 0.454, against +0.054 in CV):
+      - **it scored public LB 0.505** (+0.051 over 0.454, against +0.052 in CV):
         `ensemble_llm` is the champion.
     - **The public pool changed again (2026-11-01):**
       - one source was dropped, so new runs leave it out (#82);
@@ -177,15 +180,19 @@ outputs are a public repo, a progress diary, and a live demo app.
   - P4: hosting terms change, so check them early: free Docker Spaces disappeared behind a
     paywall. A model small enough for the browser costs nothing to serve. And look at the
     page: a headless browser found two layout bugs that every HTTP check had passed.
-  - P7: **the pool's gain held on the hidden prompts:** +0.049 in CV became **+0.044 on the
-    LB** (0.410 → 0.454), with a CV–LB gap of about −0.016. **A public dependency changes
+  - P7: **the gains held on the hidden prompts.** Comparing the recipes as submitted (seed
+    42, each with the pool it used): the pool's step, +0.051 in CV, gave **+0.044 on the
+    LB** (0.410 → 0.454); the LLM's, +0.052, gave **+0.051** (0.454 → 0.505). So the CV–LB
+    gap went from −0.012 to −0.019 with the pool, then held. `lr`'s allowlist was chosen on
+    seed 42 itself, a likely winner's curse. **A public dependency changes
     silently:** the pool lost 2 of our sources between two runs, and only a count in a log
     showed it (I-034). **A pinned version isn't a pinned environment either** (I-035).
     **Probe the worst case, not the average:** DeBERTa's probe trained on 256 random, mostly
     short passages, and its run met the rare batch of long ones. **GPU memory can't be
     tested on CPU:** the submission's runtime check caught two models sharing one T4.
-    **The LLM's gain held too:** +0.054 in CV became **+0.051 on the LB** (0.454 → 0.505),
-    and the CV–LB gap widened a little, to −0.020: watch it.
+    **A public notebook publishes its outputs:** notebook 11 had the pool among them, so
+    the pool now goes to a scratch folder. **Compare like with like:** the docs first gave
+    the LLM's step +0.054 in CV, against a recipe measured on a pool that had since changed.
 - **Leaderboard snapshot, 2026-11-02:** 4,339 teams; median 0.556; top-10% cutoff 0.663;
   best 0.744. With 0.505 we're 2,532nd (top 58%), 0.158 short of the cutoff. On 2026-10-30:
   3,954 teams, median 0.549, cutoff 0.658, and 0.454 was about 2,462nd.
@@ -213,7 +220,7 @@ CV = the seed-42 folds, the same for every row.
 | 2026-11-02 | **ensemble_llm** (P7: + the LLM, a log blend; 0.50 / 0.05 / 0.10 / 0.35; nested weights) | 0.5246 | **0.505** | — |
 | 2026-11-02 | llm (Qwen3-8B base, LoRA on 4 bits, 5,000 pool passages per fold) | 0.4705 | — | 4i8ru6ex |
 | 2026-10-30 | lr + the clean pool's 3 allowlisted sources (28,048 passages) | 0.4338 | — | — |
-| 2026-10-30 | **ensemble_pool** (I-029: lr + the pool, LM head, ModernBERT; 0.75 / 0.10 / 0.15) | 0.4705 | **0.454** | — |
+| 2026-10-30 | **ensemble_pool** (I-029: lr + the pool, LM head, ModernBERT; 0.75 / 0.10 / 0.15; CV with the clean pool it was submitted with, 0.4705 on the old one) | 0.4727 | **0.454** | — |
 | 2026-10-26 | **ensemble** (lr + LM head + ModernBERT, 0.70 / 0.15 / 0.15) | 0.4219 | **0.410** | — |
 | 2026-10-26 | encoder (ModernBERT-base, tuned) | 0.3501 | — | — |
 | 2026-10-25 | lm_blend (lr + Qwen 3 4B layers 6–9) | 0.4052 | **0.389** | — |
@@ -380,30 +387,36 @@ CV = the seed-42 folds, the same for every row.
 
 ## Next steps
 
-State on 2026-11-02 at 20:05 (session 13, continued):
+State on 2026-11-02 at 21:00 (session 13, continued):
 - **The four-member submission scored 0.505** (ref 57913980): `ensemble_llm` is the
-  champion.
-- **DeBERTa v2 was still running at 20:01**, with a source the pool dropped. It must be
-  cancelled on its Kaggle page. v3 is ready on main (#84), and the user approved pushing it
-  once v2 is cancelled.
-- **The GPU quota:** about 19.7 hours left (22.8 at 16:54, minus v2's run since). It resets
+  champion. **P7 is done**, with its final review's fixes (#89).
+- **DeBERTa v2 was still running at 20:55**, with a source the pool dropped. It must be
+  cancelled on its Kaggle page. v3 is ready on main. The user approved pushing it once v2
+  is cancelled, but #89 changed it since (the pool stays out of its outputs), so the push
+  needs a fresh OK.
+- **The GPU quota:** about 18.8 hours left (22.8 at 16:54, minus v2's run since). It resets
   on Saturday 2026-11-07, 00:00 UTC.
 
-The ledgers: P7's `.superpowers/sdd/2026-10-27-p7-llm-ensemble/progress.md`, and P8's
-`.superpowers/sdd/2026-10-30-p8-medal-push/progress.md`. Every Kaggle push, dataset,
-submission and tag needs the user's OK.
+The ledger: P8's `.superpowers/sdd/2026-10-30-p8-medal-push/progress.md`. Every Kaggle
+push, dataset, submission and tag needs the user's OK.
 
-1. **P7 Task 9:**
-   - P7's journal, from its ledger (ADR 0006 is written);
-   - then the final review: a fresh reviewer reads P7's whole range, then one fix pass;
-   - then delete P7's workspace.
+1. **Your action on Kaggle:** notebooks 09 and 11 to private (Status, under P7).
 2. **DeBERTa v3:**
-   - once v2 is cancelled: `kaggle kernels push -p notebooks/13-pool-deberta` (approved);
+   - once v2 is cancelled, and with the user's OK on #89's change:
+     `kaggle kernels push -p notebooks/13-pool-deberta`;
    - after its 11 hours: download it to `data/kaggle-outputs/pool-deberta-v3`, then log it
      to W&B;
    - then its gate, `--extra deberta=.../mean.npy`. The champion now blends in log space,
      so the gate first needs a `--log` option for both sides (it has `--candidate-log`).
-3. **P8 Task 5 onward:** the submission with pool members.
+     With it, P7's Minor F: the gate's LLM loader checks the seed and refuses duplicate
+     folds.
+3. **P8 Task 5 onward:** the submission with pool members. P7's review left it four
+   things:
+   - the runtime bar must bound the hidden run, since the stand-in check runs again in it
+     (Minor A);
+   - the `USE_ENCODER = False` fallback crashes, and the intro is stale (B);
+   - pin `peft` and `bitsandbytes` in the release (H);
+   - two docstrings still say three members (J).
 4. **Kaggle runs two GPU sessions at once**, so runs can overlap.
 5. **Now and then:**
    - look at the dashboard;

@@ -31,6 +31,7 @@ extension.
 
 ## Journals
 
+- [P7: the LLM and the ensemble](p7-llm-ensemble.md) (2026-10-27 → 11-02)
 - [P6: the MLOps loop, watching the site and the models](p6-mlops-loop.md) (2026-10-27 → 28)
 - [P4: the app and continuous deployment](p4-app.md) (2026-10-26 → 27)
 - [P5: fine-tuned encoders](p5-encoders.md) (2026-10-25 → 26)
