@@ -130,6 +130,16 @@ def test_ensemble_config_rejects_alpha_outside_0_1():
         EnsembleConfig(name="e", weights=(0.5, 0.2, 0.3), sinkhorn_alpha=1.5)
 
 
+def test_shipped_ensemble_llm_config_loads():
+    # P7's four-member ensemble (Task 7): the LLM joins I-029's three, in a LOG blend, its
+    # weights chosen by nested CV on seed 42 (0.5246 against the three's 0.4819). The offline
+    # submission loads it by NAME, then the LLM config it names.
+    cfg = load_config("ensemble_llm", model_cls=EnsembleConfig)
+    assert cfg.llm == "llm" and cfg.log_blend and cfg.sinkhorn_alpha == 0
+    assert len(cfg.weights) == 4 and cfg.text_pool == 30_000
+    assert load_config(cfg.llm, model_cls=LLMConfig).name == cfg.llm
+
+
 def test_shipped_ensemble_config_still_loads():
     # The 0.410 and 0.454 ensembles keep their meaning: no LLM, no balancing, a plain mean.
     for name in ("ensemble", "ensemble_pool"):
