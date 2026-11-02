@@ -3,13 +3,15 @@
 # 0.587 public LB alone, trained on 193k clean passages.
 # Settings left to the builder by the spec (§7): starting points for a large encoder.
 #   - lr 1e-5: large models need smaller steps than base ones (ours used 4.4e-5 at base).
-#   - batch_size 8 at 512 tokens: what a T4's 16 GB holds for a 435M-parameter model.
+#   - batch_size 4: 8 ran out of memory (notebook 13 v1). The model, its gradients and AdamW's
+#     state take about 7 GB in float32; a batch of 8 long passages needed the rest of the
+#     T4's 15.6 GB, and more. 4 halves the activations. The probe checks the worst batch.
 #   - pool_size 0: the notebook sets the real number from its speed probe, so the run fits
 #     the session (rows_for_budget).
 name: deberta_pool
 base_model: microsoft/deberta-v3-large
 max_length: 512
-batch_size: 8
+batch_size: 4
 lr: 1.0e-05
 epochs: 2
 warmup_ratio: 0.1

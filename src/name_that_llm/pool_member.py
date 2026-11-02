@@ -164,12 +164,22 @@ def fit_pool_member(
 def probe_pool_member(
     cfg: EncoderConfig | LLMConfig, pool: pd.DataFrame, train: pd.DataFrame, n: int = 256
 ) -> dict:
-    """Time 1 epoch on n honest pool passages, in float16 as the real run would train.
+    """Time 1 epoch on n honest pool passages, as the real run would train.
 
-    Returns the seconds per training passage, the model's load time, the peak GPU memory,
-    and whether the loss stayed finite: the notebook sizes the real run from it, and falls
-    back to float32 if float16 overflowed. Run it in a process of its own (main's --probe):
-    a model freed inside a long-lived process can keep its GPU memory (P7 Task 5).
+    Returns the seconds per training passage, the model's load time, the peak GPU memory
+    beside the GPU's own, and whether float16 stayed finite: the notebook sizes the real
+    run from it, and uses float32 if float16 overflowed. Run it in a process of its own
+    (main's --probe): a model freed inside a long-lived process can keep its GPU memory
+    (P7 Task 5).
+
+    Two lessons from notebook 13 v1 (P8 Task 4):
+      - The first step is the WORST batch: the cfg.batch_size longest honest passages. A
+        batch is padded to its own longest passage, so memory peaks on the rare batch of
+        long ones, which n random passages may never form. v1's probe peaked at 14.1 GB of
+        the T4's 15.6, then its run ran out of memory. The step also warms the GPU up, so
+        the timing that follows is the steady state.
+      - If float16 overflows, float32 is timed too, since the real run will train in it:
+        the time until an overflow says nothing about a whole epoch's.
     """
     import torch
 
@@ -177,25 +187,39 @@ def probe_pool_member(
 
     probe = cfg.model_copy(update={"epochs": 1})
     rows = honest_training_set(pool, train, min(n, len(pool)), cfg.seed)
+    honest = honest_training_set(pool, train, None, cfg.seed)
+    worst = honest.iloc[honest["text"].str.len().to_numpy().argsort()[-cfg.batch_size :]]
     torch.manual_seed(cfg.seed)
     start = time.time()
     model, tokenizer = _load(probe)
     load_s = time.time() - start
-    if torch.cuda.is_available():
+    cuda = torch.cuda.is_available()
+    if cuda:
         torch.cuda.reset_peak_memory_stats()
-    texts = _texts(rows["text"].tolist(), tokenizer, cfg)
-    start = time.time()
+
+    def seconds_per_passage(amp: bool) -> float:
+        """One step on the worst batch, then 1 timed epoch on the n passages."""
+        worst_texts = _texts(worst["text"].tolist(), tokenizer, cfg)
+        train_encoder(model, tokenizer, worst_texts, worst["model"].to_numpy(), probe, amp=amp)
+        texts = _texts(rows["text"].tolist(), tokenizer, cfg)
+        start = time.time()
+        train_encoder(model, tokenizer, texts, rows["model"].to_numpy(), probe, amp=amp)
+        return (time.time() - start) / max(1, len(texts))
+
     try:
-        train_encoder(model, tokenizer, texts, rows["model"].to_numpy(), probe)
-        finite = True
-    except FloatingPointError:  # float16 overflowed: the real run must use float32
-        finite = False
-    per_passage = (time.time() - start) / max(1, len(texts))
-    peak_gb = torch.cuda.max_memory_allocated() / 1e9 if torch.cuda.is_available() else 0.0
+        per_passage = seconds_per_passage(amp=True)
+    except FloatingPointError:  # float16 overflowed: the real run will train in float32
+        per_passage = None
+    finite = per_passage is not None
+    if not finite:  # outside the except: its traceback would keep the failed try's memory
+        per_passage = seconds_per_passage(amp=False)
     return {
         "seconds_per_passage": round(per_passage, 3),
         "model_load_seconds": round(load_s, 1),
-        "peak_memory_gb": round(peak_gb, 2),
+        "peak_memory_gb": round(torch.cuda.max_memory_allocated() / 1e9, 2) if cuda else 0.0,
+        "gpu_memory_gb": (
+            round(torch.cuda.get_device_properties(0).total_memory / 1e9, 2) if cuda else 0.0
+        ),
         "finite": finite,
     }
 
