@@ -153,19 +153,34 @@ def test_predict_submission_ensemble_needs_its_pool(fake_train):
         _pool_ensemble(fake_train, test, text_pool=40, pool=None)
 
 
-def _llm_ensemble(fake_train, fake_data_dir, p_llm, alpha=0.0, weights=(0.01, 0.01, 0.01, 0.97)):
+def _llm_ensemble(
+    fake_train,
+    fake_data_dir,
+    p_llm,
+    alpha=0.0,
+    weights=(0.01, 0.01, 0.01, 0.97),
+    p_encoder=None,
+    log_blend=False,
+):
     """predict_submission_ensemble with a 4-member config (P7 Task 8)."""
     test = load_test(fake_data_dir)
     rng = np.random.default_rng(0)
+    # Drawn in this order, so every test without its own p_encoder keeps the same inputs.
+    lm_train, lm_test = rng.normal(size=(len(fake_train), 8)), rng.normal(size=(len(test), 8))
+    if p_encoder is None:
+        p_encoder = rng.dirichlet(np.ones(18), size=len(test))
+    cfg = EnsembleConfig(
+        name="e", weights=weights, llm="llm", sinkhorn_alpha=alpha, log_blend=log_blend
+    )
     return predict_submission_ensemble(
         _cfg(),
         BlendConfig(name="b", lm_variation="x", layer=0, weight=0.5),
-        EnsembleConfig(name="e", weights=weights, llm="llm", sinkhorn_alpha=alpha),
+        cfg,
         fake_train,
         test,
-        rng.normal(size=(len(fake_train), 8)),
-        rng.normal(size=(len(test), 8)),
-        rng.dirichlet(np.ones(18), size=len(test)),
+        lm_train,
+        lm_test,
+        p_encoder,
         p_llm=p_llm,
     )
 
@@ -190,6 +205,25 @@ def test_ensemble_submission_applies_sinkhorn(fake_train, fake_data_dir):
     plain = _llm_ensemble(fake_train, fake_data_dir, p_llm, alpha=0.0)
     balanced = _llm_ensemble(fake_train, fake_data_dir, p_llm, alpha=1.0)
     assert balanced["model"].nunique() > plain["model"].nunique()
+
+
+def test_ensemble_submission_follows_the_log_blend(fake_train, fake_data_dir):
+    # The champion blends in log space (I-015), with weights searched for that form, so the
+    # submission must too: the probability blend with those weights is another model, one
+    # the gate measured 0.014 lower. Here the two forms disagree. The encoder is sure of
+    # label 0; the LLM all but rules it out, and leans to label 1. The plain mean keeps
+    # label 0 (0.455 against 0.275); the geometric mean lets the LLM veto it (0.095 against
+    # 0.158). P7's final review: nothing caught a submission that dropped the log form.
+    test = load_test(fake_data_dir)
+    p_encoder = np.full((len(test), 18), 0.05 / 16)
+    p_encoder[:, :2] = [0.90, 0.05]
+    p_llm = np.full((len(test), 18), 0.49 / 16)
+    p_llm[:, :2] = [0.01, 0.50]
+    both = dict(weights=(0.0, 0.0, 0.5, 0.5), p_encoder=p_encoder)  # the encoder and the LLM
+    plain = _llm_ensemble(fake_train, fake_data_dir, p_llm, **both)
+    log = _llm_ensemble(fake_train, fake_data_dir, p_llm, log_blend=True, **both)
+    assert set(plain["model"]) == {LABELS[0]}
+    assert set(log["model"]) == {LABELS[1]}
 
 
 def test_llm_probabilities_of_the_wrong_shape_are_refused(fake_train, fake_data_dir):

@@ -116,6 +116,20 @@ def test_shipped_pool_sources_load():
     assert all(s.slug.count("/") == 1 for s in sources)
 
 
+def test_lr_allowlist_is_the_three_measured_sources():
+    # lr's pool is the one the gates measured (I-032: 3 sources, 28,048 passages in the
+    # pinned v10). The maintainer's clean release removed the other two, prvsiyan and
+    # ayhampar, and the user withdrew a challenger trained on them (#66). So they stay out
+    # even when a release brings them back, as prvsiyan did on 2026-11-01: a return needs a
+    # new check. Without this, the weekly retraining would train on it unseen (P7's review).
+    (pool,) = [s for s in load_pool_sources("pool") if s.keep]
+    assert sorted(pool.include) == [
+        "darragh1walsh/ntl-kaggle-ai-gen-run-1",
+        "drjcfmd/ntl-generated-v2",
+        "vbandaru/ntl-extra-passages-w05",
+    ]
+
+
 def test_build_pool_credits_each_row_to_its_original_source(fake_train, tmp_path):
     # A merged pool names each row's original dataset in a column (source_column).
     folder = tmp_path / "owner__fake-pool"

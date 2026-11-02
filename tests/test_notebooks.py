@@ -15,10 +15,21 @@ import pytest
 import yaml
 
 NOTEBOOKS = Path(__file__).resolve().parents[1] / "notebooks"
+# P8's rule: the trained weights, and the Kaggle notebooks that hold or use them, stay private
+# until 2027-01-13. We also never publish the pool's passages (ADR 0006).
+PRIVATE_UNTIL_THE_DEADLINE = [
+    "09-encoder-final",  # the encoder's 5 fold models
+    "11-llm-explore",  # its run's outputs hold the pool it trained on
+    "12-llm-final",  # the LLM's 5 fold adapters
+    "13-pool-deberta",  # DeBERTa's weights
+    "90-submit",  # the submission, which uses them all
+]
 
 
-def run_notebook(path: Path, env: dict[str, str], monkeypatch) -> None:
-    """Execute the code cells of the notebook at `path`, in order, with `env` set."""
+def run_notebook(path: Path, env: dict[str, str], monkeypatch) -> dict:
+    """Execute the code cells of the notebook at `path`, in order, with `env` set.
+
+    Returns the notebook's variables, for the checks that need more than its output files."""
     cells = json.loads(path.read_text(encoding="utf-8"))["cells"]
     lines = [
         line
@@ -29,7 +40,23 @@ def run_notebook(path: Path, env: dict[str, str], monkeypatch) -> None:
     ]
     for key, value in env.items():
         monkeypatch.setenv(key, value)
-    exec(compile("\n".join(lines), str(path), "exec"), {"__name__": "__main__"})
+    namespace = {"__name__": "__main__"}
+    exec(compile("\n".join(lines), str(path), "exec"), namespace)
+    return namespace
+
+
+def assert_no_pool_in(work: Path) -> None:
+    """The pool's passages never become a notebook output. Kaggle publishes everything under
+    /kaggle/working with the notebook: P7's final review found notebook 11's pool there."""
+    assert not list(work.rglob("*.parquet"))
+
+
+def test_notebooks_holding_weights_or_the_pool_stay_private():
+    # Every push sends this file's `is_private`, so a `false` here would make a notebook
+    # public again, whatever its page says. P7's final review found 09 and 11 public.
+    for name in PRIVATE_UNTIL_THE_DEADLINE:
+        meta = json.loads((NOTEBOOKS / name / "kernel-metadata.json").read_text(encoding="utf-8"))
+        assert meta["is_private"] is True, name
 
 
 def fake_kaggle_input(root: Path, tiny_qwen: Path, train) -> None:
@@ -55,7 +82,7 @@ def fake_open_pool(root: Path) -> None:
 
     pool = root / "name-that-llm-open-pool"
     pool.mkdir()
-    kept = ["drjcfmd/ntl-generated-v2", "ayhampar/ntl-pool-ft"]
+    kept = ["drjcfmd/ntl-generated-v2", "vbandaru/ntl-extra-passages-w05"]
     rows = [
         {
             "text": f"pooltopic{i} " + f"marker{i % 18} words about things here " * 7,
@@ -129,6 +156,7 @@ def test_llm_explore_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_pat
     assert results["mean"].between(0, 1).all()
     chosen = LLMConfig(**yaml.safe_load((work / "llm-chosen.yaml").read_text(encoding="utf-8")))
     assert chosen.seed == 7 and chosen.pool_size in (0, 5000, 15000)
+    assert_no_pool_in(work)
 
 
 def test_llm_final_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_path, monkeypatch):
@@ -163,6 +191,7 @@ def test_llm_final_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_path,
     for job, k in [("seed42-f4", 4)]:
         assert np.load(work / "runs" / job / f"fold{k}.npz")[f"fold{k}"].shape[1] == 18
         assert (work / "adapters" / job / f"fold{k}" / "adapter_config.json").exists()
+    assert_no_pool_in(work)
 
 
 def test_pool_deberta_notebook_runs(tiny_encoder, fake_data_dir, fake_train, tmp_path, monkeypatch):
@@ -170,8 +199,6 @@ def test_pool_deberta_notebook_runs(tiny_encoder, fake_data_dir, fake_train, tmp
     # (one per T4), sized by a speed probe. Here a tiny DeBERTa-style model on CPU, on a fake
     # copy of the pinned pool.
     pytest.importorskip("torch")
-    import pandas as pd
-
     inp = tmp_path / "input"
     inp.mkdir()
     fake_open_pool(inp)
@@ -188,7 +215,7 @@ def test_pool_deberta_notebook_runs(tiny_encoder, fake_data_dir, fake_train, tmp
         "NTL_ENCODER_CONFIG": str(config),
         "NTL_DATA_DIR": str(fake_data_dir),
     }
-    run_notebook(NOTEBOOKS / "13-pool-deberta" / "pool_deberta.ipynb", env, monkeypatch)
+    notebook = run_notebook(NOTEBOOKS / "13-pool-deberta" / "pool_deberta.ipynb", env, monkeypatch)
 
     results = json.loads((work / "results.json").read_text())
     assert set(results["scores"]) == {"42", "43", "mean"}
@@ -196,4 +223,5 @@ def test_pool_deberta_notebook_runs(tiny_encoder, fake_data_dir, fake_train, tmp
     for seed in (42, 43):
         assert np.load(work / "runs" / f"seed{seed}.npz")["train"].shape == (len(fake_train), 18)
     counts = json.loads((work / "pool_counts.json").read_text())
-    assert sum(counts.values()) == len(pd.read_parquet(work / "pool.parquet"))
+    assert sum(counts.values()) == len(notebook["pool"])  # the counts, but not the passages
+    assert_no_pool_in(work)
