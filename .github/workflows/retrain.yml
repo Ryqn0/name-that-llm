@@ -37,10 +37,11 @@ jobs:
           # build_pool.py dedupes the pool against our passages: name_that_llm.data finds
           # them through this variable (the first run failed without it).
           NTL_DATA_DIR: ${{ runner.temp }}/data
+        # --with six, on both calls: kaggle imports six without declaring it; python-dateutil 4.0 stopped bringing it (I-035).
         run: |
-          uvx --from "kaggle==2.2.5" kaggle competitions download name-that-llm -p "$RUNNER_TEMP/data"
+          uvx --from "kaggle==2.2.5" --with six kaggle competitions download name-that-llm -p "$RUNNER_TEMP/data"
           unzip -q "$RUNNER_TEMP/data/name-that-llm.zip" -d "$RUNNER_TEMP/data"
-          uv run --with "kaggle==2.2.5" python scripts/build_pool.py --download \
+          uv run --with "kaggle==2.2.5" --with six python scripts/build_pool.py --download \
             --root "$RUNNER_TEMP/external" --out "$RUNNER_TEMP/pool.parquet"
       - name: Retrain, and propose a challenger if it wins
         env:

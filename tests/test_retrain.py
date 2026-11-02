@@ -94,6 +94,18 @@ def test_the_retraining_workflow_keeps_its_write_token_in_one_step():
     assert "kaggle==" in commands and "kaggle>=" not in commands
 
 
+def test_every_kaggle_cli_call_brings_six():
+    # I-035: kaggle imports six without declaring it, and python-dateutil 4.0 (2026-11)
+    # stopped bringing it in: Sunday's retraining and the pool watch failed on import.
+    calls = [
+        line
+        for path in sorted((ROOT / ".github/workflows").glob("*.yml"))
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if '"kaggle==' in line or '"kaggle>=' in line
+    ]
+    assert calls and all("--with six" in line for line in calls), calls
+
+
 def test_the_pull_request_step_sets_up_git_credentials_before_pushing(monkeypatch, tmp_path):
     # Without credentials kept by the checkout, `git push` gets them from gh (GH_TOKEN).
     spec = importlib.util.spec_from_file_location(
