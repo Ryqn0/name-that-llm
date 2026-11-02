@@ -10,7 +10,7 @@
   "enable_internet": false,
   "dataset_sources": [
     "ryqn00/name-that-llm-lib",
-    "crtproduction/name-that-llm-open-pool",
+    "ryqn00/name-that-llm-pool-v10",
     "ryqn00/name-that-llm-llm-adapters"
   ],
   "competition_sources": [
