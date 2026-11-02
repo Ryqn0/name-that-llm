@@ -23,7 +23,12 @@
     3. one of the two final submissions stays pool-free (`ensemble`, LB 0.410), so a late
        ruling against generated data can't sink us.
   - **`lr` keeps an allowlist** of the sources that helped it when added alone: 5, then 3
-    after the maintainer's clean release removed two (I-028, I-032).
+    after the maintainer's clean release removed two (I-028, I-032). The two left the
+    allowlist too (P7's final review), so one that comes back upstream, as prvsiyan did on
+    2026-11-01, stays out until it's checked again.
+  - **We never publish the pool's passages.** The GPU notebooks write the pool to a scratch
+    folder, since Kaggle publishes everything under `/kaggle/working` with the notebook
+    (P7's final review found it among public notebook 11's outputs).
   - **P8's amendments** (I-034, the user's call on drops):
     - every run reads our private, pinned copy of a release (`ryqn00/name-that-llm-pool-v10`);
     - a weekly check compares the latest release with the pin, source by source;
@@ -38,9 +43,10 @@
       one shared base.
 - **Consequences:**
   - **The gains held on the hidden prompts.** `lr` with the pool went from CV 0.3212 to
-    0.4338. The ensemble with it went from LB 0.410 to 0.454 (+0.044, against +0.049 in CV).
-    The LLM alone scores 0.4705 on five folds, our best single member, and four members in
-    a log blend reach 0.5246 (seed 42, nested weights).
+    0.4338. The ensemble with it went from LB 0.410 to 0.454 (+0.044, against +0.051 in CV
+    for the recipe as submitted, with the clean pool). The LLM alone scores 0.4705 on five
+    folds, our best single member, and four members in a log blend reach 0.5246 (seed 42,
+    nested weights): LB 0.505 (+0.051, against +0.052 in CV).
   - **The cost is GPU time.** A pair of pooled folds takes about 4 hours on Kaggle's two
     T4s, so one seed of five folds took three sessions. There is one seed only, so the
     blend's weights come from nested cross-validation (P8 Task 3).
