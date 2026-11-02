@@ -21,6 +21,7 @@ from name_that_llm.pool_member import (
     fit_pool_member,
     honest_training_set,
     label_weights,
+    probe_pool_member,
     rows_for_budget,
 )
 
@@ -76,6 +77,49 @@ def test_rows_for_budget_fits_the_session():
     assert rows_for_budget(1.0, 2, 600, 100_000) == 18_000  # 600 minutes, 2 epochs
     assert rows_for_budget(1.0, 2, 600, 5_000) == 5_000  # never more than the pool holds
     assert rows_for_budget(1.0, 2, 0, 5_000) == 0  # no time left: skip, don't start
+
+
+def _record_probe(monkeypatch, overflow: bool = False) -> list[tuple[list[str], bool]]:
+    """Run the probe's training through a recorder of each call's texts and precision (amp).
+    With overflow, every float16 call fails, as DeBERTa-v3's can on a T4."""
+    pytest.importorskip("torch")  # the probe reads the GPU's memory through torch
+    import name_that_llm.encoder as encoder
+    import name_that_llm.pool_member as pool_member
+
+    calls = []
+
+    def fake_train_encoder(model, tokenizer, texts, y, cfg, amp=True, **_):
+        calls.append((list(texts), amp))
+        if overflow and amp:
+            raise FloatingPointError("non-finite loss")
+        return [1.0]
+
+    monkeypatch.setattr(encoder, "train_encoder", fake_train_encoder)
+    monkeypatch.setattr(pool_member, "_load", lambda cfg: (None, None))
+    return calls
+
+
+def test_probe_steps_on_the_longest_batch_first(monkeypatch, fake_train):
+    # A batch is padded to its own longest passage, so memory peaks on the rare batch of long
+    # ones, which n random passages may never form: notebook 13 v1's probe peaked at 14.1 GB,
+    # then its run ran out of memory. So the probe's first step is the worst batch.
+    calls = _record_probe(monkeypatch)
+    pool = _pool(4)
+    pool.loc[[5, 40, 70], "text"] += " long" * 50  # three passages far longer than the rest
+    cfg = EncoderConfig(name="t", base_model="unused", batch_size=3)
+    out = probe_pool_member(cfg, pool, fake_train, n=16)
+    assert sorted(calls[0][0]) == sorted(pool.loc[[5, 40, 70], "text"])
+    assert len(calls[1][0]) == 16 and out["finite"]
+
+
+def test_probe_times_float32_after_a_float16_overflow(monkeypatch, fake_train):
+    # The real run then trains in float32, so that's the speed to size it by: the time until
+    # an overflow says nothing about a whole epoch's.
+    calls = _record_probe(monkeypatch, overflow=True)
+    cfg = EncoderConfig(name="t", base_model="unused", batch_size=3)
+    out = probe_pool_member(cfg, _pool(4), fake_train, n=16)
+    assert not out["finite"]
+    assert [amp for _, amp in calls] == [True, False, False]  # overflow, then both in float32
 
 
 def test_fit_pool_member_predicts_every_passage_and_saves_each_epoch(
