@@ -48,7 +48,7 @@ jobs:
       - run: cp kaggle/lib-dataset/dataset-metadata.json dist-kaggle/
 
       # A new dataset VERSION replaces the previous file set. The token lives in the
-      # repo's GitHub Secrets, never in the code.
-      - run: uvx --from "kaggle>=2.2.3" kaggle datasets version -p dist-kaggle -m "$GITHUB_REF_NAME"
+      # repo's GitHub Secrets, never in the code. --with six: kaggle imports six without declaring it; python-dateutil 4.0 stopped bringing it (I-035).
+      - run: uvx --from "kaggle>=2.2.3" --with six kaggle datasets version -p dist-kaggle -m "$GITHUB_REF_NAME"
         env:
           KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
