@@ -17,4 +17,6 @@ sources:
   source_column: source_dataset
   keep: true
   include: null
-  exclude: []
+  exclude:
+  # Dropped by the 2026-11-01 release (the check, run by hand that day: 7,620 passages here).
+  - maniceet/name-that-llm-openrouter-openai-generations
