@@ -1,6 +1,7 @@
 # ADR 0004: Serve the champion on CPU, from a model registry
 
-- **Status:** accepted (2026-10-26, P4)
+- **Status:** accepted (2026-10-26, P4). Amended 2026-11-02 (P7): the served model may
+  differ from the leaderboard's champion (see the last consequence).
 - **Context:**
   - The champion averages three models: `lr` (TF-IDF and logistic regression), the LM
     head (a logistic regression on Qwen 3 4B base, layers 6 to 9), and 5 fine-tuned
@@ -42,3 +43,9 @@
   - Given up, to add when needed: batching several passages, GPU serving, and int8
     quantization (less memory, faster on CPU, but the parity check would have to be
     redone).
+  - **Amendment (2026-11-02, P7):** the leaderboard's champion, `ensemble_llm` (LB 0.505),
+    has a member that needs a CUDA GPU: Qwen3-8B with LoRA on 4-bit weights, which
+    bitsandbytes runs on CUDA only (and 16 GB in float16 is too much for a CPU host). So
+    the registry serves a champion that runs on CPU: `ensemble` v1 (LB 0.410) for now.
+    `ensemble_pool` (LB 0.454) also runs on CPU, and is the next one to register.
+    Context.md names the leaderboard's champion, and the app's `/version` the served one.
