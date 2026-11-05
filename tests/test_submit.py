@@ -232,3 +232,44 @@ def test_llm_probabilities_of_the_wrong_shape_are_refused(fake_train, fake_data_
         _llm_ensemble(fake_train, fake_data_dir, np.full((len(test), 17), 1 / 17))
     with pytest.raises(ValueError, match="llm"):
         _llm_ensemble(fake_train, fake_data_dir, None)  # the config has an llm member
+
+
+def _extra_ensemble(fake_train, fake_data_dir, p_extra):
+    """predict_submission_ensemble with one extra member, "x", holding all the weight."""
+    test = load_test(fake_data_dir)
+    rng = np.random.default_rng(0)
+    lm_train, lm_test = rng.normal(size=(len(fake_train), 8)), rng.normal(size=(len(test), 8))
+    return predict_submission_ensemble(
+        _cfg(),
+        BlendConfig(name="b", lm_variation="x", layer=0, weight=0.5),
+        EnsembleConfig(name="e", weights=(0, 0, 0, 1), extra_members=["x"]),
+        fake_train,
+        test,
+        lm_train,
+        lm_test,
+        rng.dirichlet(np.ones(18), size=len(test)),
+        p_extra=p_extra,
+    )
+
+
+def test_extra_member_probabilities_are_required_and_aligned(fake_train, fake_data_dir):
+    n_test = len(load_test(fake_data_dir))
+    with pytest.raises(ValueError, match=r"extra members are \['x'\], got \[\]"):
+        _extra_ensemble(fake_train, fake_data_dir, None)
+    for shape in ((n_test, 17), (n_test - 1, 18)):
+        with pytest.raises(ValueError, match="x has shape"):
+            _extra_ensemble(fake_train, fake_data_dir, {"x": np.full(shape, 1 / 18)})
+
+
+def test_an_unknown_extra_member_is_refused(fake_train, fake_data_dir):
+    # A member the config doesn't name has no weight: it would be dropped without a word.
+    uniform = np.full((len(load_test(fake_data_dir)), 18), 1 / 18)
+    with pytest.raises(ValueError, match=r"got \['x', 'y'\]"):
+        _extra_ensemble(fake_train, fake_data_dir, {"x": uniform, "y": uniform})
+
+
+def test_an_extra_member_with_all_the_weight_decides(fake_train, fake_data_dir):
+    one_hot = np.zeros((len(load_test(fake_data_dir)), 18))
+    one_hot[:, 3] = 1.0
+    sub = _extra_ensemble(fake_train, fake_data_dir, {"x": one_hot})
+    assert set(sub["model"]) == {LABELS[3]}

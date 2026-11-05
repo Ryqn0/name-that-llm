@@ -15,6 +15,8 @@ as a table instead, one summary number per setting.
 Usage (repo root, `wandb login` done):
   python -I -X utf8 scripts/log_gpu_run.py OOF.npy --seed 7 --name llm-first \
       [--results results.json] [--expect LLM]
+  python -I -X utf8 scripts/log_gpu_run.py mean.npy --seed 42 --name deberta-pool \
+      --config deberta_pool --encoder --results results.json --expect mean
   python -I -X utf8 scripts/log_gpu_run.py results.csv --seed 7 --name llm-explore \
       --config llm-chosen.yaml
 """
@@ -26,7 +28,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from name_that_llm.config import LLMConfig, load_config
+from name_that_llm.config import EncoderConfig, LLMConfig, load_config
 from name_that_llm.cv import make_folds
 from name_that_llm.data import load_train
 from name_that_llm.tracking import PROJECT, log_cv_run
@@ -51,6 +53,9 @@ def main(argv=None) -> None:
     parser.add_argument("--seed", type=int, required=True, help="the fold seed of the run")
     parser.add_argument("--name", required=True, help="the W&B run's name")
     parser.add_argument("--config", default="llm", help="the LLM config the run used")
+    # An encoder's file also loads as an LLMConfig, which would then record LoRA settings
+    # the run never had.
+    parser.add_argument("--encoder", action="store_true", help="--config is an encoder's")
     parser.add_argument("--results", type=Path, help="the notebook's results.json")
     parser.add_argument("--expect", help="results.json's score key that must match the OOF's")
     args = parser.parse_args(argv)
@@ -77,7 +82,7 @@ def main(argv=None) -> None:
                 f"{notebook['scores'][args.expect]:.4f}: the rows don't line up"
             )
 
-    cfg = load_config(args.config, model_cls=LLMConfig)
+    cfg = load_config(args.config, model_cls=EncoderConfig if args.encoder else LLMConfig)
     cfg = cfg.model_copy(update={"name": args.name, "seed": args.seed})
     print("W&B run:", log_cv_run(cfg, result, train, extra))
 

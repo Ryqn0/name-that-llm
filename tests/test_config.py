@@ -145,3 +145,21 @@ def test_shipped_ensemble_config_still_loads():
     for name in ("ensemble", "ensemble_pool"):
         cfg = load_config(name, model_cls=EnsembleConfig)
         assert cfg.llm is None and cfg.sinkhorn_alpha == 0 and cfg.log_blend is False
+
+
+def test_ensemble_config_counts_its_weights():
+    # One weight per member: text, LM head, encoder, [llm], then every extra member.
+    with pytest.raises(ValidationError, match="4 weights"):
+        EnsembleConfig(name="e", weights=(0.5, 0.2, 0.3), extra_members=["x"])
+    cfg = EnsembleConfig(
+        name="e", weights=(0.4, 0.2, 0.1, 0.2, 0.1), llm="llm", extra_members=["x"]
+    )
+    assert cfg.extra_members == ["x"]
+    assert EnsembleConfig(name="e", weights=(0.5, 0.2, 0.3)).extra_members == []
+
+
+def test_shipped_ensemble_p8_config_loads():
+    # The notebook loads this by name, and the member's config by the name it holds.
+    cfg = load_config("ensemble_p8", model_cls=EnsembleConfig)
+    assert cfg.extra_members == ["deberta_pool"] and cfg.llm == "llm" and cfg.log_blend
+    assert load_config(cfg.extra_members[0], model_cls=EncoderConfig).epochs == 2

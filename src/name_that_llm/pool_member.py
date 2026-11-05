@@ -72,6 +72,30 @@ def rows_for_budget(seconds_per_passage: float, epochs: int, minutes: float, ava
     return max(0, min(available, math.floor(minutes * 60 / (seconds_per_passage * epochs))))
 
 
+def find_member_dirs(
+    seeds: Sequence[int],
+    epochs: int,
+    root: Path = Path("/kaggle/input"),
+    marker: str = "config.json",
+) -> list[Path]:
+    """Each seed's final model under `root` (folders */seed<s>/epoch<epochs>/), in seeds' order.
+
+    Searched, never hard-coded, as encoder.find_fold_dirs: Kaggle mounts an attached
+    notebook's output under a path that has changed before. Only the FINAL epoch counts: its
+    predictions chose the blend's weights, so a run that stopped part-way, or one seed of
+    two, would silently change the submission. Anything else is an error.
+    """
+    finals = [p.parent for p in Path(root).rglob(marker) if p.parent.name == f"epoch{epochs}"]
+    dirs = {d.parent.name: d for d in finals}
+    missing = [f"seed{s}" for s in seeds if f"seed{s}" not in dirs]
+    if missing:
+        raise FileNotFoundError(
+            f"no folder */{missing[0]}/epoch{epochs}/ with a {marker} under {root}: is the pool "
+            "member's notebook attached, and did its run finish?"
+        )
+    return [dirs[f"seed{s}"] for s in seeds]
+
+
 def _member_config(name_or_path: str) -> EncoderConfig | LLMConfig:
     """The config, as an encoder's or an LLM's. EncoderConfig forbids the LoRA fields an LLM
     config carries, so an LLM YAML fails it and loads as an LLMConfig."""
