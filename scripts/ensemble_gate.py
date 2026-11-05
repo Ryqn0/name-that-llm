@@ -30,9 +30,14 @@ P7's choices for the shipped blend (the same members, a different form):
   ... --baseline M --candidate M --candidate-log          (I-015: the log blend)
   ... --baseline M --candidate M --candidate-sinkhorn A   (I-027: Sinkhorn at strength A)
 Sinkhorn balances all scored rows at once, as the submission does the whole test.
+P8's gate (the champion is a log blend, so the baseline must be one too, or the gain mixes
+the new member with the blend's form):
+  ... --extra deberta=PATH.npy --log
 """
 
 import argparse
+import re
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -59,6 +64,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--extra", action="append", default=[], help="NAME=PATH.npy, repeatable")
     parser.add_argument("--baseline", default=",".join(STANDARD), help="member names")
     parser.add_argument("--candidate", help="member names (default: baseline + extras)")
+    parser.add_argument("--log", action="store_true", help="blend both sides in log space")
     parser.add_argument("--candidate-log", action="store_true", help="blend it in log space")
     parser.add_argument(
         "--candidate-sinkhorn", type=float, default=0.0, help="Sinkhorn's strength, in [0, 1]"
@@ -71,7 +77,32 @@ def parse_args(argv=None) -> argparse.Namespace:
         "--encoder-oof-dir", type=Path, default=Path("data/kaggle-outputs/encoder-final")
     )
     parser.add_argument("--cache", type=Path, default=Path("data/runs"))
+    # For checks that start from the blend (Task 7's centering): the honest, nested OOF.
+    parser.add_argument("--save-oof", type=Path, help="write the candidate's nested OOF here")
     return parser.parse_args(argv)
+
+
+def load_llm_folds(runs: Sequence[Path], folds: np.ndarray) -> np.ndarray:
+    """The LLM's (n, 18) predictions from notebook 12's fold files, NaN on folds not done.
+
+    A fold file doesn't say which seed made it, and fold k of seed 7 holds other rows than
+    fold k of seed 42: the wrong folder would give wrong predictions with the right shape.
+    So only a job named for our seed loads (seed42-f01). A fold found twice stops the gate
+    too, since the last file found would otherwise win without a word (P7's final review).
+    """
+    llm = np.full((len(folds), len(LABELS)), np.nan)
+    seen = set()
+    for path in sorted(p for d in runs for p in d.glob("*/fold*.npz")):
+        job = path.parent.name
+        if f"seed{SEED}" not in re.findall(r"seed\d+", job):
+            raise SystemExit(f"STOP: job {job} isn't named for seed {SEED}")
+        k = int(path.stem.removeprefix("fold"))
+        if k in seen:
+            raise SystemExit(f"STOP: fold {k} found twice, the second time in job {job}")
+        seen.add(k)
+        with np.load(path) as npz:
+            llm[folds == k] = npz[f"fold{k}"]
+    return llm
 
 
 def _members(args, train: pd.DataFrame, folds: np.ndarray) -> dict[str, np.ndarray]:
@@ -79,14 +110,7 @@ def _members(args, train: pd.DataFrame, folds: np.ndarray) -> dict[str, np.ndarr
     ens = load_config("ensemble_pool", model_cls=EnsembleConfig)
     bcfg = load_config(ens.blend, model_cls=BlendConfig)
     cfg = load_config(bcfg.text_config).model_copy(update={"seed": SEED})
-    members = {}
-
-    llm = np.full((len(train), len(LABELS)), np.nan)
-    for path in sorted(p for d in args.llm_runs for p in d.glob("*/fold*.npz")):
-        k = int(path.stem.removeprefix("fold"))
-        with np.load(path) as npz:
-            llm[folds == k] = npz[f"fold{k}"]
-    members["llm"] = llm
+    members = {"llm": load_llm_folds(args.llm_runs, folds)}
 
     include = [name for s in load_pool_sources() if s.keep for name in (s.include or [])]
     pool = pd.read_parquet(args.pool)
@@ -137,22 +161,23 @@ def main(argv=None) -> None:
 
     for name in used:
         print(f"  {name} alone: {acc(members[name]):.4f}")
-    base_oof, _ = nested_blend_oof([members[m] for m in base], y, folds, rows)
-    cand_oof, cand_w = nested_blend_oof(
-        [members[m] for m in cand], y, folds, rows, log=args.candidate_log
-    )
+    base_log, cand_log = args.log, args.log or args.candidate_log
+    base_oof, _ = nested_blend_oof([members[m] for m in base], y, folds, rows, log=base_log)
+    cand_oof, cand_w = nested_blend_oof([members[m] for m in cand], y, folds, rows, log=cand_log)
     if args.candidate_sinkhorn:
         cand_oof[rows] = sinkhorn_balance(cand_oof[rows], args.candidate_sinkhorn)
+    if args.save_oof:
+        np.save(args.save_oof, cand_oof)
     for k, w in cand_w.items():
         print(f"fold {k}: candidate weights {w}")
-    print(f"\nbaseline {'+'.join(base)}: {acc(base_oof):.4f}")
-    form = " (log)" if args.candidate_log else ""
+    print(f"\nbaseline {'+'.join(base)}{' (log)' if base_log else ''}: {acc(base_oof):.4f}")
+    form = " (log)" if cand_log else ""
     form += f" (Sinkhorn {args.candidate_sinkhorn})" if args.candidate_sinkhorn else ""
     print(f"candidate {'+'.join(cand)}{form}: {acc(cand_oof):.4f}")
     old, new = (LABEL_ARRAY[p[rows].argmax(axis=1)] for p in (base_oof, cand_oof))
     diff, lo, hi = prompt_bootstrap_ci(y[rows], old, new, prompts[rows])
     print(f"gain {diff:+.4f}, prompt bootstrap 95% CI [{lo:+.4f}, {hi:+.4f}]")
-    final, _ = best_blend_weights([members[m][rows] for m in cand], y[rows], log=args.candidate_log)
+    final, _ = best_blend_weights([members[m][rows] for m in cand], y[rows], log=cand_log)
     print(f"the weights to ship ({', '.join(cand)}): {final}")
     preview = "" if len(done) == 5 else f" (a preview: {len(done)} of 5 folds)"
     print(f"\nVERDICT: {'PROMOTE' if lo > 0 else 'KEEP'} (gate: lower bound > 0){preview}")
