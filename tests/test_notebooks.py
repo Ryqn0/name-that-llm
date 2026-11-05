@@ -22,6 +22,7 @@ PRIVATE_UNTIL_THE_DEADLINE = [
     "11-llm-explore",  # its run's outputs hold the pool it trained on
     "12-llm-final",  # the LLM's 5 fold adapters
     "13-pool-deberta",  # DeBERTa's weights
+    "14-pool-llm",  # its adapters
     "90-submit",  # the submission, which uses them all
 ]
 
@@ -222,6 +223,43 @@ def test_pool_deberta_notebook_runs(tiny_encoder, fake_data_dir, fake_train, tmp
     assert all(0 <= s <= 1 for s in results["scores"].values())
     for seed in (42, 43):
         assert np.load(work / "runs" / f"seed{seed}.npz")["train"].shape == (len(fake_train), 18)
+    counts = json.loads((work / "pool_counts.json").read_text())
+    assert sum(counts.values()) == len(notebook["pool"])  # the counts, but not the passages
+    assert_no_pool_in(work)
+
+
+def test_pool_llm_notebook_runs(tiny_qwen, fake_data_dir, fake_train, tmp_path, monkeypatch):
+    # Notebook 14 (P8 Task 6): Qwen3-8B with LoRA trained once on the honest pool, two seeds
+    # (one per T4), sized by a speed probe. Here a tiny random Qwen on CPU, on a fake copy of
+    # the pinned pool. The attached model's folder must replace the config's Hub name.
+    pytest.importorskip("peft")
+    inp = tmp_path / "input"
+    fake_kaggle_input(inp, tiny_qwen, fake_train)
+    fake_open_pool(inp)
+    (inp / "name-that-llm-open-pool").rename(inp / "name-that-llm-pool-v10")  # the pin's name
+    work = tmp_path / "working"
+    work.mkdir()
+    config = tmp_path / "llm_pool.yaml"
+    tiny = dict(name="llm_pool", base_model="unused", load_in_4bit=False, n_layers=4, lora_r=4)
+    tiny |= dict(lora_alpha=8, max_length=64, batch_size=8, lr=5e-3, epochs=2)
+    config.write_text(yaml.safe_dump(tiny), encoding="utf-8")
+    env = {
+        "NTL_INPUT": str(inp),
+        "NTL_WORK": str(work),
+        "NTL_LLM_CONFIG": str(config),
+        "NTL_DATA_DIR": str(fake_data_dir),
+    }
+    notebook = run_notebook(NOTEBOOKS / "14-pool-llm" / "pool_llm.ipynb", env, monkeypatch)
+
+    results = json.loads((work / "results.json").read_text())
+    assert set(results["scores"]) == {"42", "43", "mean"}
+    assert all(0 <= s <= 1 for s in results["scores"].values())
+    for seed in (42, 43):
+        assert np.load(work / "runs" / f"seed{seed}.npz")["train"].shape == (len(fake_train), 18)
+        models = work / "models" / f"seed{seed}"
+        for epoch in (1, 2):  # every epoch's adapter: the submission loads the last
+            assert (models / f"epoch{epoch}" / "adapter_config.json").exists()
+    assert np.load(work / "mean.npy").shape == (len(fake_train), 18)
     counts = json.loads((work / "pool_counts.json").read_text())
     assert sum(counts.values()) == len(notebook["pool"])  # the counts, but not the passages
     assert_no_pool_in(work)
