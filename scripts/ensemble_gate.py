@@ -77,6 +77,8 @@ def parse_args(argv=None) -> argparse.Namespace:
         "--encoder-oof-dir", type=Path, default=Path("data/kaggle-outputs/encoder-final")
     )
     parser.add_argument("--cache", type=Path, default=Path("data/runs"))
+    # For checks that start from the blend (Task 7's centering): the honest, nested OOF.
+    parser.add_argument("--save-oof", type=Path, help="write the candidate's nested OOF here")
     return parser.parse_args(argv)
 
 
@@ -164,6 +166,8 @@ def main(argv=None) -> None:
     cand_oof, cand_w = nested_blend_oof([members[m] for m in cand], y, folds, rows, log=cand_log)
     if args.candidate_sinkhorn:
         cand_oof[rows] = sinkhorn_balance(cand_oof[rows], args.candidate_sinkhorn)
+    if args.save_oof:
+        np.save(args.save_oof, cand_oof)
     for k, w in cand_w.items():
         print(f"fold {k}: candidate weights {w}")
     print(f"\nbaseline {'+'.join(base)}{' (log)' if base_log else ''}: {acc(base_oof):.4f}")
