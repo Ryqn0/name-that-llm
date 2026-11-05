@@ -9,6 +9,8 @@ This is what the OFFLINE Kaggle submission notebook calls. Kaggle reruns that no
     submissions, so validate_submission raises a precise error here instead.
 """
 
+from collections.abc import Mapping
+
 import numpy as np
 import pandas as pd
 
@@ -117,18 +119,25 @@ def predict_submission_ensemble(
     p_encoder: np.ndarray,
     pool: pd.DataFrame | None = None,
     p_llm: np.ndarray | None = None,
+    p_extra: Mapping[str, np.ndarray] | None = None,
 ) -> pd.DataFrame:
-    """The P5 submission: the text model, the LM head and a fine-tuned encoder, blended.
+    """The ensemble's submission: the text model, the LM head, a fine-tuned encoder, and
+    optionally the LLM and pool members, blended.
 
-    P7 adds a fourth member: `p_llm` holds the LoRA'd LLM's (n_test, 18) probabilities (the
-    mean of its fold adapters, computed in the notebook like the encoder's), required when
+    P7 adds the LLM: `p_llm` holds the LoRA'd LLM's (n_test, 18) probabilities (the mean of
+    its fold adapters, computed in the notebook like the encoder's), required when
     `ens_cfg.llm` is set. The blend follows `ens_cfg.log_blend`, and `ens_cfg.sinkhorn_alpha`
     > 0 then balances the predictions (I-015, I-027).
+
+    P8 adds pool members: `p_extra` maps each of `ens_cfg.extra_members` to its (n_test, 18)
+    probabilities, the mean of its seeds, computed in the notebook too. They come last in
+    the blend, in the config's order. Every member needs its entry, and an entry the config
+    doesn't name is refused, since it would have no weight and vanish without a word.
 
     `p_encoder` holds the encoder's (n_test, 18) probabilities: the mean of its 5 fold
     models (encoder.predict_proba_folds). The notebook computes it, so this module stays
     torch-free like the LM features. `blend_cfg` supplies the LM head's C; its own weight
-    is ignored, since `ens_cfg.weights` sets all three shares together.
+    is ignored, since `ens_cfg.weights` sets every share together.
 
     `pool` (pool.build_pool) is required when `ens_cfg.text_pool` > 0 (I-029): the text
     model then also trains on a seeded sample of that many pool passages. Every prompt is
@@ -158,6 +167,15 @@ def predict_submission_ensemble(
         members = [p_llm]
     elif p_llm is not None:
         raise ValueError(f"p_llm given, but {ens_cfg.name} has no llm member")
+    extra = dict(p_extra or {})
+    if set(extra) != set(ens_cfg.extra_members):
+        raise ValueError(
+            f"{ens_cfg.name}'s extra members are {ens_cfg.extra_members}, got {sorted(extra)}"
+        )
+    for name in ens_cfg.extra_members:
+        if np.shape(extra[name]) != expected:
+            raise ValueError(f"{name} has shape {np.shape(extra[name])}, not {expected}")
+        members.append(extra[name])
     p_text = predict_proba_test(text_cfg, text_train, test)
     p_lm = _lm_proba(blend_cfg.C, train, lm_train, lm_test)
     proba = blend([p_text, p_lm, p_encoder, *members], ens_cfg.weights, log=ens_cfg.log_blend)

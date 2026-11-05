@@ -18,6 +18,7 @@ import pytest
 from name_that_llm.config import EncoderConfig, LLMConfig
 from name_that_llm.labels import LABELS
 from name_that_llm.pool_member import (
+    find_member_dirs,
     fit_pool_member,
     honest_training_set,
     label_weights,
@@ -187,3 +188,24 @@ def test_class_weights_change_the_loss(tiny_encoder, fake_train):
     plain = last_loss(None)
     assert last_loss(np.ones(18)) == pytest.approx(plain, rel=1e-4)
     assert last_loss(skewed) != pytest.approx(plain, rel=1e-3)
+
+
+def _model_dir(root, seed, epoch):
+    folder = root / "pool-deberta" / "models" / f"seed{seed}" / f"epoch{epoch}"
+    folder.mkdir(parents=True)
+    (folder / "config.json").write_text("{}")
+    return folder
+
+
+def test_find_member_dirs_takes_each_seeds_final_epoch(tmp_path):
+    wanted = [_model_dir(tmp_path, 42, 2), _model_dir(tmp_path, 43, 2)]
+    _model_dir(tmp_path, 42, 1)  # an earlier epoch: the gate never measured these weights
+    assert find_member_dirs((42, 43), 2, tmp_path) == wanted
+
+
+def test_find_member_dirs_refuses_a_missing_seed(tmp_path):
+    # One seed in place of two would silently change the submission.
+    _model_dir(tmp_path, 42, 2)
+    _model_dir(tmp_path, 43, 1)  # stopped part-way: its last finished epoch isn't the final one
+    with pytest.raises(FileNotFoundError, match="seed43"):
+        find_member_dirs((42, 43), 2, tmp_path)

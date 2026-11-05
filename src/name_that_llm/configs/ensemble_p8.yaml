@@ -1,0 +1,18 @@
+# P8's five-member ensemble (Task 5): P7's four members plus DeBERTa-v3-large, trained once
+# on the whole clean pool and never on one of our passages (notebook 13, two seeds).
+# PREVIEW: these weights come from the gate on version 2's predictions, which still held a
+# dropped source. Version 3's gate replaces them before this ships.
+name: ensemble_p8
+blend: lm_blend
+encoder: encoder
+llm: llm
+text_pool: 30000
+log_blend: true
+extra_members:
+- deberta_pool
+weights:  # text, LM head, encoder, LLM, DeBERTa
+- 0.2
+- 0.15
+- 0.0
+- 0.25
+- 0.4

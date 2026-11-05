@@ -120,11 +120,13 @@ class LLMConfig(BaseModel):
 
 
 class EnsembleConfig(BaseModel):
-    """Three models mixed by a weighted mean of probabilities (P5).
+    """Models mixed by a weighted mean of probabilities (P5), plain or geometric (P7).
 
-    The two models of the BlendConfig `blend` (its text model and its LM head) plus the
-    fine-tuned EncoderConfig `encoder`. The blend's own weight is ignored: all three
-    weights are chosen together, on seed-7 folds (blend.best_blend_weights).
+    The two models of the BlendConfig `blend` (its text model and its LM head), the
+    fine-tuned EncoderConfig `encoder`, then optionally the LLM (P7) and pool members (P8).
+    The blend's own weight is ignored: all the weights are chosen together
+    (blend.best_blend_weights), on seed-7 folds for the three-member recipes, by nested CV
+    on seed 42 since the LLM (scripts/ensemble_gate.py).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -132,7 +134,8 @@ class EnsembleConfig(BaseModel):
     name: str
     blend: str = "lm_blend"  # the BlendConfig whose text model and LM head are reused
     encoder: str = "encoder"  # the EncoderConfig of the fine-tuned encoder
-    # text model, LM head, encoder, [llm], in that order. blend() normalizes them to sum to 1.
+    # text model, LM head, encoder, [llm], then each of extra_members, in that order. blend()
+    # normalizes them to sum to 1.
     weights: tuple[NonNegativeFloat, ...]
     # Pool passages the text model also trains on (I-029: 30,000 lifted the ensemble by
     # +0.049 on seed 42). 0: our passages only, as in P5. The LM head and the encoder never
@@ -144,13 +147,16 @@ class EnsembleConfig(BaseModel):
     sinkhorn_alpha: float = Field(0.0, ge=0.0, le=1.0)
     # The weighted geometric mean instead of the arithmetic one (I-015, blend(log=True)).
     log_blend: bool = False
+    # P8: pool members (their configs' names), each with one more weight, after the LLM's.
+    extra_members: list[str] = []
 
     @model_validator(mode="after")
     def _one_weight_per_member(self) -> "EnsembleConfig":
-        expected = 3 + (self.llm is not None)
-        if len(self.weights) != expected:
-            members = "text, LM head, encoder" + (", llm" if self.llm else "")
-            raise ValueError(f"expected {expected} weights ({members}), got {len(self.weights)}")
+        names = ["text", "LM head", "encoder", *(["llm"] if self.llm else []), *self.extra_members]
+        if len(self.weights) != len(names):
+            raise ValueError(
+                f"expected {len(names)} weights ({', '.join(names)}), got {len(self.weights)}"
+            )
         return self
 
 
