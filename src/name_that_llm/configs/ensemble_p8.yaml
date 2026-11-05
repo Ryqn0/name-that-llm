@@ -1,7 +1,9 @@
 # P8's five-member ensemble (Task 5): P7's four members plus DeBERTa-v3-large, trained once
 # on the whole clean pool and never on one of our passages (notebook 13, two seeds).
-# PREVIEW: these weights come from the gate on version 2's predictions, which still held a
-# dropped source. Version 3's gate replaces them before this ships.
+# The weights are the gate's, on version 3's predictions (nested CV, seed 42): CV 0.5920
+# against the champion's 0.5246, gain +0.0674, 95% CI [+0.0522, +0.0838]. The encoder gets 0
+# in all five folds, since DeBERTa covers what it added. It stays listed: the blend's form
+# needs its place, and its share is 0 whatever it predicts.
 name: ensemble_p8
 blend: lm_blend
 encoder: encoder
@@ -12,7 +14,7 @@ extra_members:
 - deberta_pool
 weights:  # text, LM head, encoder, LLM, DeBERTa
 - 0.2
-- 0.15
+- 0.1
 - 0.0
-- 0.25
-- 0.4
+- 0.35
+- 0.35
