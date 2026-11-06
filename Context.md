@@ -41,25 +41,40 @@ outputs are a public repo, a progress diary, and a live demo app.
   [journal](docs/journal/p7-llm-ensemble.md),
   [ADR 0006](docs/adr/0006-generated-data-and-lora.md). The four-member submission scored
   **public LB 0.505**, and the final review's fixes shipped in #89.
-  - **Your action:** switch two Kaggle notebooks to private on their pages (Settings →
-    Sharing). 11 (`name-that-llm-llm-explore`) has the pool among its outputs, and 09
-    (`name-that-llm-encoder-final`) the encoder's weights. Their metadata now says private.
-    Don't Quick Save them: the submit notebook attaches 09's outputs.
+  - **Your action:** switch notebook 11 (`name-that-llm-llm-explore`) to private on its
+    page (Settings → Sharing). It has the pool among its outputs, and it was still public on
+    2026-11-06, though its metadata says private. 09 is private. Don't Quick Save 09: the
+    submit notebook attaches its outputs.
 - **P8 in progress** (the medal push, approved 2026-10-30:
   [design](docs/superpowers/specs/2026-10-30-p8-medal-push-design.md),
   [plan](docs/superpowers/plans/2026-10-30-p8-medal-push.md)): our own strong models on
-  the whole clean pool, blended, for a top-10% finish. Tasks 1–3 of 9 are done:
+  the whole clean pool, blended, for a top-10% finish. Tasks 1–4 of 9 are done, and 5–7 are
+  built, waiting on CI (Next steps):
   - **the pinned pool** is the private dataset `ryqn00/name-that-llm-pool-v10`, minus the
     sources later releases dropped (`configs/pool_all.yaml`'s `exclude`);
   - **the weekly pool watch** (`pool-watch.yml`, Wednesdays) is on;
   - **the honest pool member** (`pool_member.py`) trains once on the pool alone and
     predicts all our passages.
-  - **Task 4, DeBERTa-v3-large on the pool (notebook 13):**
-    - v1 ran out of GPU memory 8 minutes into training, at batch 8;
-    - v2 still held a source the 2026-11-01 release dropped, so it's to be cancelled;
-    - v3, ready on main, trains at batch 4. Its probe steps on the worst batch first, and
-      the run doesn't start if that batch takes over 85% of the GPU. Since #89, it also
-      keeps the pool out of its outputs.
+  - **Task 4, DeBERTa-v3-large on the pool (notebook 13), done:**
+    - v3, on the clean pool (190,887 passages, 164,308 per seed, 594 minutes), scored
+      **0.5698** with its two seeds averaged (0.5509 and 0.5439 alone). That's above the
+      whole champion ensemble, from a model that never saw one of our passages;
+    - v1 ran out of GPU memory at batch 8. v2 kept a dropped source and scored 0.5542, so
+      it's a preview that is never submitted. Each seed moved by under 0.005 between v2 and
+      v3, and the log loss didn't change, so dropping the source made no measurable
+      difference;
+    - **the gate** (log blends on both sides, nested weights): 0.5246 → **0.5920**, +0.0674,
+      95% CI [+0.0522, +0.0838]. **PROMOTE.**
+  - **Task 5, the five-member submission:** built in #92, not yet run on Kaggle.
+    `ensemble_p8` is a log blend weighted 0.20 / 0.10 / 0.00 / 0.35 / 0.35 (`lr`, LM head,
+    ModernBERT, LLM, DeBERTa). ModernBERT gets 0 in all five folds. The notebook stops
+    unless the attached run's pool held 190,887 passages.
+  - **Task 6, the LLM on far more of the pool:** notebook 14 is built in #93, not pushed. It
+    needs about 10.5 hours of GPU.
+  - **Task 7, centering: dropped** (#94; the submission does not change). On the five-member
+    blend, 300 random layouts each, alpha 0.25 gains −0.0004, +0.0006 and +0.0020 at 1, 2 and 3
+    answers per prompt, against +0.0141 at 18. The prompt bootstrap's CIs include 0 at 1, 2 and
+    3, and leaving each passage out of its own group's mean changed nothing. P3a's pattern again.
 - **P6** (the MLOps loop) was done on 2026-10-28:
   [plan](docs/superpowers/plans/2026-10-27-p6-mlops-loop.md),
   [journal](docs/journal/p6-mlops-loop.md),
@@ -193,9 +208,15 @@ outputs are a public repo, a progress diary, and a live demo app.
     **A public notebook publishes its outputs:** notebook 11 had the pool among them, so
     the pool now goes to a scratch folder. **Compare like with like:** the docs first gave
     the LLM's step +0.054 in CV, against a recipe measured on a pool that had since changed.
-- **Leaderboard snapshot, 2026-11-02:** 4,339 teams; median 0.556; top-10% cutoff 0.663;
-  best 0.744. With 0.505 we're 2,532nd (top 58%), 0.158 short of the cutoff. On 2026-10-30:
-  3,954 teams, median 0.549, cutoff 0.658, and 0.454 was about 2,462nd.
+  - P8: **more data beat our own data.** DeBERTa trained on 164,308 pool passages and none
+    of ours, and it beat every model that learned from ours. **Averaging is a cheap gain:**
+    two seeds score about 0.02 above either one alone. **A skipped test proves nothing:** the notebook smoke tests skip without torch and peft, so a "failing"
+    run can be a skip. **Point a check at the thing it checks:** the first `pool_counts.json`
+    under `/kaggle/input` could have been another run's. **A CI provider is a dependency
+    too:** a billing lock stopped every merge, release and robot at once.
+- **Leaderboard snapshot, 2026-11-05:** 4,804 teams; median 0.569; top-10% cutoff 0.666;
+  best 0.747. With 0.505 we're 2,891st (top 60%), 0.161 short of the cutoff. On 2026-11-02:
+  4,339 teams, median 0.556, cutoff 0.663.
 - Champion: **`ensemble_llm`** (since 2026-11-02, public LB **0.505**), a log blend (a
   weighted geometric mean) of four models' probabilities, 0.50 / 0.05 / 0.10 / 0.35:
   1. `lr`, the word + character TF-IDF logistic regression, trained on our passages plus
@@ -217,6 +238,8 @@ CV = the seed-42 folds, the same for every row.
 
 | date | model | CV | LB | W&B run |
 |---|---|---|---|---|
+| 2026-11-06 | ensemble_p8 (P8: + DeBERTa, a log blend; 0.20 / 0.10 / 0.00 / 0.35 / 0.35; nested weights; not yet submitted) | 0.5920 | — | — |
+| 2026-11-05 | deberta_pool (DeBERTa-v3-large on the clean pool alone, 2 seeds averaged) | 0.5698 | — | 63bq6ceg |
 | 2026-11-02 | **ensemble_llm** (P7: + the LLM, a log blend; 0.50 / 0.05 / 0.10 / 0.35; nested weights) | 0.5246 | **0.505** | — |
 | 2026-11-02 | llm (Qwen3-8B base, LoRA on 4 bits, 5,000 pool passages per fold) | 0.4705 | — | 4i8ru6ex |
 | 2026-10-30 | lr + the clean pool's 3 allowlisted sources (28,048 passages) | 0.4338 | — | — |
@@ -247,6 +270,8 @@ CV = the seed-42 folds, the same for every row.
   - `scripts/` and `docs/`
 - **Commands:** `uv sync --all-extras` · `uv run --all-extras pytest -q` ·
   `uv run pre-commit run --all-files`.
+  - That pytest run skips about 40 tests that need torch. The full suite (256 tests, about
+    8 minutes): `uv run --all-extras --with torch --with transformers --with peft pytest -q`.
 - **Local data (gitignored):** `kaggle competitions download name-that-llm -p data/raw`, then
   `Expand-Archive data/raw/name-that-llm.zip data/raw`. Load it with
   `name_that_llm.data.load_train()` and `load_test()`, never with a bare `pd.read_csv`:
@@ -318,6 +343,8 @@ CV = the seed-42 folds, the same for every row.
   look at a local page, drive headless Edge with Playwright and answer its requests from
   the folder (`uv run --no-project --with playwright`, `channel="msedge"`), rather than
   serving it.
+- **`kaggle quota`** gives the GPU hours left and the refresh time. Quota counts wall-clock
+  hours, so T4 × 2 costs the same as one T4.
 - **Sleep pauses long local runs.** An overnight CPU check stood still while the PC slept,
   and resumed on waking. To check a run, compare its CPU time with its age, not just
   whether it's alive.
@@ -387,36 +414,28 @@ CV = the seed-42 folds, the same for every row.
 
 ## Next steps
 
-State on 2026-11-02 at 21:00 (session 13, continued):
-- **The four-member submission scored 0.505** (ref 57913980): `ensemble_llm` is the
-  champion. **P7 is done**, with its final review's fixes (#89).
-- **DeBERTa v2 was still running at 20:55**, with a source the pool dropped. It must be
-  cancelled on its Kaggle page. v3 is ready on main. The user approved pushing it once v2
-  is cancelled, but #89 changed it since (the pool stays out of its outputs), so the push
-  needs a fresh OK.
-- **The GPU quota:** about 18.8 hours left (22.8 at 16:54, minus v2's run since). It resets
-  on Saturday 2026-11-07, 00:00 UTC.
+State on 2026-11-06 (session 14):
+- **DeBERTa v3 is done, and the gate says PROMOTE** (0.5246 → 0.5920). #91, #92, #93 and the
+  centering PR are built and pushed.
+- **GitHub Actions is locked:** "the job was not started because your account is locked due to
+  a billing issue", since 2026-11-05. No CI, no merges, no release, no deploy, and no robot, so
+  the "robot silent" alert is expected. Nothing merges without CI unless the user waives it.
+- **The GPU quota:** 4.25 hours left, and 30 fresh ones on Saturday 2026-11-07, 00:00 UTC.
 
 The ledger: P8's `.superpowers/sdd/2026-10-30-p8-medal-push/progress.md`. Every Kaggle
 push, dataset, submission and tag needs the user's OK.
 
-1. **Your action on Kaggle:** notebooks 09 and 11 to private (Status, under P7).
-2. **DeBERTa v3:**
-   - once v2 is cancelled, and with the user's OK on #89's change:
-     `kaggle kernels push -p notebooks/13-pool-deberta`;
-   - after its 11 hours: download it to `data/kaggle-outputs/pool-deberta-v3`, then log it
-     to W&B;
-   - then its gate, `--extra deberta=.../mean.npy`. The champion now blends in log space,
-     so the gate first needs a `--log` option for both sides (it has `--candidate-log`).
-     With it, P7's Minor F: the gate's LLM loader checks the seed and refuses duplicate
-     folds.
-3. **P8 Task 5 onward:** the submission with pool members. P7's review left it four
-   things:
-   - the runtime bar must bound the hidden run, since the stand-in check runs again in it
-     (Minor A);
-   - the `USE_ENCODER = False` fallback crashes, and the intro is stale (B);
-   - pin `peft` and `bitsandbytes` in the release (H);
-   - two docstrings still say three members (J).
+1. **Your actions:**
+   - fix GitHub's billing lock ([settings](https://github.com/settings/billing));
+   - notebook 11 to private (Status, under P7).
+2. **Once CI runs again:** `gh run rerun` on #91, #92, #93 and the centering PR, then merge
+   them. Tag `v0.11.0` (the user's OK), wait for `release-lib`, then push and submit notebook
+   90 in the foreground (the user's OK). Ledger the LB and the CV–LB gap. Expected LB: about
+   0.57 (0.5920 with the −0.02 gap).
+3. **Task 6, from Saturday:** `kaggle kernels push -p notebooks/14-pool-llm` (the user's OK;
+   check `SESSION_MIN` against `kaggle quota`). After its 10.5 hours: download, log to W&B,
+   then the gate with `--extra deberta=... --extra llm_pool=... --log`. Two more DeBERTa seeds
+   are the other good use of a session (I-038).
 4. **Kaggle runs two GPU sessions at once**, so runs can overlap.
 5. **Now and then:**
    - look at the dashboard;
