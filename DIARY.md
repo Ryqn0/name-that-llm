@@ -2,6 +2,42 @@
 
 Newest entry first. Each entry follows the same format: **Did / Learned / Scores / Next**.
 
+## 2026-11-06 · Session 14: DeBERTa beats the whole ensemble, and GitHub locks the pipeline
+
+**Did**
+- **DeBERTa-v3-large on the pool (notebook 13):**
+  - v2 was never cancelled and ran to its end: 0.5542, a free preview. It still held a
+    dropped source, so it's never submitted;
+  - v3, on the clean pool: **0.5698** with its two seeds averaged, above the whole champion
+    ensemble's 0.5246, from a model that never saw one of our passages;
+  - both are logged to W&B from the PC (`deberta-pool`, and `deberta-pool-v2-preview`).
+- **The gate on v3: PROMOTE.** 0.5246 → **0.5920** (+0.0674, 95% CI [+0.0522, +0.0838]). It
+  now blends both sides in log space, and refuses a wrong seed or a duplicate fold (#91).
+- **The five-member submission is built** (#92), with P7's four review leftovers. ModernBERT
+  gets a weight of 0 in all five folds.
+- **Notebook 14, the LLM on far more of the pool, is built** (#93), and passes its smoke test.
+- **Centering (Task 7): dropped** (#94). It gains +0.024 at 18 answers per prompt and about 0
+  at 1 or 2: P3a's pattern again. 30 random layouts showed +0.0026 at 1 answer; 300 showed
+  about 0, so the check now uses 300.
+
+**Learned**
+- **More data beat our own data.** 164,308 pool passages, and none of ours, gave our best
+  model by 0.10.
+- **Blends pay for different mistakes.** ModernBERT was worth +0.021 in P5, and now 0: DeBERTa
+  covers what it added.
+- **Averaging two seeds adds about 0.02**, with no new idea and no new code.
+- **v2 against v3 looks like +0.016, but it's noise.** Each seed moved by under 0.005 and the
+  log loss didn't change. A difference between two averages needs the seeds beside it.
+- **A skipped test proves nothing.** The notebook smoke test "ran" in half a second because
+  it skipped without torch and peft. Its real failure needed them installed.
+- **A CI provider is a dependency too.** One billing lock stopped every merge, the release,
+  the deploy and the robot at once.
+
+**Scores:** DeBERTa 0.5698 alone; the five-member blend 0.5920 in CV, not yet submitted. Public
+LB still 0.505, 2,891st of 4,804. The top-10% cutoff is 0.666.
+
+**Next:** fix the billing lock, merge, release v0.11.0, submit. From Saturday, notebook 14.
+
 ## 2026-11-02 · Session 13: the LLM joins the ensemble, and three silent upstream changes
 
 **Did**
