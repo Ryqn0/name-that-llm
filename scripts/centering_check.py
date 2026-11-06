@@ -13,7 +13,7 @@ one draw, where any gain counts. An alpha is kept only if it gains at every m.
 Prints numbers only, never a passage.
 
 Usage (repo root, with the OOF from ensemble_gate.py's --save-oof):
-  python -I -X utf8 scripts/centering_check.py data/runs/oof-ensemble-p8-seed42.npy [--draws 30]
+  python -I -X utf8 scripts/centering_check.py data/runs/oof-ensemble-p8-seed42.npy [--draws 300]
 """
 
 import argparse
@@ -60,7 +60,8 @@ def standard_error(gains: np.ndarray) -> float:
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("oof", type=Path, help="the blend's nested (n, 18) OOF")
-    parser.add_argument("--draws", type=int, default=30, help="random layouts for each m < 18")
+    # 300: 30 draws showed +0.0026 at m = 1, where 300 show about 0. A layout of 150 rows is noisy.
+    parser.add_argument("--draws", type=int, default=300, help="random layouts for each m < 18")
     args = parser.parse_args(argv)
 
     train = load_train()
