@@ -1,7 +1,13 @@
 import numpy as np
 import pytest
 
-from name_that_llm.blend import best_blend_weight, best_blend_weights, blend, nested_blend_oof
+from name_that_llm.blend import (
+    best_blend_weight,
+    best_blend_weights,
+    blend,
+    center,
+    nested_blend_oof,
+)
 from name_that_llm.labels import LABELS
 from name_that_llm.metrics import score
 
@@ -121,3 +127,32 @@ def test_nested_blend_oof_can_blend_in_log_space():
         fit = best_blend_weights([p[rest] for p in probas], y[rest], log=True)[0]
         assert weights[k] == fit
         np.testing.assert_allclose(out[here], blend([p[here] for p in probas], fit, log=True))
+
+
+def test_center_with_alpha_zero_changes_nothing():
+    rng = np.random.default_rng(0)
+    p = rng.dirichlet(np.ones(18), 40)
+    assert np.allclose(center(p, rng.integers(0, 4, 40), 0.0), p)
+
+
+def test_center_removes_a_shared_group_bias():
+    # Each row has its own winner (+1). Group 0's rows all lean to label 0 by +2 as well, as a
+    # shared topic would. Centering takes the lean out and leaves each row's own signal.
+    n = 34
+    own = 1 + np.arange(n) % 17
+    logits = np.zeros((n, 18))
+    logits[np.arange(n), own] = 1.0
+    groups = np.repeat([0, 1], n // 2)
+    logits[groups == 0, 0] += 2.0
+    p = np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)
+    assert (p[groups == 0].argmax(axis=1) == 0).all()  # before: the lean wins
+    out = center(p, groups, 0.9)
+    assert (out.argmax(axis=1) == own).all()
+    assert np.allclose(out.sum(axis=1), 1.0)
+
+
+@pytest.mark.parametrize("alpha", [1.0, 1.5, -0.1])
+def test_center_refuses_alpha_outside_its_range(alpha):
+    # At 1, a group of one row would lose all its signal and become uniform.
+    with pytest.raises(ValueError, match="alpha"):
+        center(np.full((2, 18), 1 / 18), np.zeros(2, dtype=int), alpha)

@@ -13,6 +13,8 @@ import itertools
 from collections.abc import Sequence
 
 import numpy as np
+import pandas as pd
+from scipy.special import softmax
 
 from name_that_llm.labels import LABELS
 from name_that_llm.metrics import score
@@ -39,6 +41,20 @@ def blend(probas: Sequence[np.ndarray], weights: Sequence[float], log: bool = Fa
     # Subtracting each row's max before exp keeps the numbers in range; it cancels out.
     out = np.exp(logs - logs.max(axis=1, keepdims=True))
     return out / out.sum(axis=1, keepdims=True)
+
+
+def center(proba: np.ndarray, groups: np.ndarray, alpha: float) -> np.ndarray:
+    """Take `alpha` of each group's mean log-probability out of its rows (P8 Task 7).
+
+    A topic pulls every passage about it toward the same labels, and the group's mean is that
+    pull, so removing it leaves what is particular to each passage. That only holds if a group
+    has many passages: in a small one, the mean is mostly the row's own signal. So alpha stays
+    below 1, where a group of one row would lose everything and become uniform.
+    """
+    if not 0 <= alpha < 1:
+        raise ValueError(f"alpha must be in [0, 1), got {alpha}")
+    logs = pd.DataFrame(np.log(np.clip(np.asarray(proba, dtype=float), 1e-12, 1.0)))
+    return softmax((logs - alpha * logs.groupby(groups).transform("mean")).to_numpy(), axis=1)
 
 
 def best_blend_weight(
